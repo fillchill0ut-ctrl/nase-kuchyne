@@ -120,13 +120,18 @@ if (CONFIG.claude) {
 }
 
 /* sign-in */
+let booted = false, live = false;
 async function boot() {
   const v = (location.hash || '').slice(1); show(VIEWS.includes(v) ? v : 'tyden');
-  if (loadCache()) applyMem();
-  const { data: { session } } = await sb.auth.getSession();
+  const hasCache = loadCache(); if (hasCache) applyMem();
+  let session = null;
+  try { ({ data: { session } } = await sb.auth.getSession()) } catch (e) {}
+  // No signal: never ask to log in again, just show what the phone remembers
+  if (!session && hasCache && !navigator.onLine) { toast('Jste offline – zobrazuji poslední uložený stav.'); return }
   if (!session) { $('login').hidden = false; return }
+  booted = true;
   $('login').hidden = true; $('who').textContent = session.user.email;
-  try { await flushOutbox(); await loadAll(); subscribeLive() }
+  try { await flushOutbox(); await loadAll(); if (!live) { live = true; subscribeLive() } }
   catch (e) {
     if (!navigator.onLine) toast('Jste offline – zobrazuji poslední uložený stav.');
     else toast('Data se nepodařilo načíst. Zkuste to znovu.');
@@ -142,5 +147,15 @@ $('logout').onclick = async () => {
   await sb.auth.signOut(); try { localStorage.removeItem(CACHE_KEY) } catch (e) {}
   location.reload();
 };
+// The session is stored on the phone and refreshed automatically; only an explicit
+// "Odhlásit" (or a revoked account) brings the login screen back.
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') $('login').hidden = false;
+  if (event === 'SIGNED_IN' && session && !booted) boot();
+});
+// When the app comes back from the background, refresh data instead of showing old state
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && booted && navigator.onLine) flushOutbox().then(loadAll).catch(() => {});
+});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 boot();
