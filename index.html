@@ -272,8 +272,8 @@ function renderWeek(){
         <button class="mtitle${has?' has':''}" data-open="${esc(m.recipeId||'')}" ${has?'':'disabled'}>${esc(m.title||'—')}</button>
         ${m.note?`<div class="mnote">${esc(m.note)}</div>`:''}
         ${rr?.sourceUrl?`<div style="margin-top:3px"><a class="link" href="${esc(rr.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a></div>`:''}
-        ${sample&&!sw?`<div class="row" style="margin-top:4px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button></div>`:''}
-        ${sw?swapBox():''}
+        ${!sw&&!reqFor(d.date,slot)?`<div class="row" style="margin-top:4px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button></div>`:''}
+        ${sw?swapBox():reqBox(d.date,slot)}
       </div></div>`});
     h+='</article>'});
   h+='</div>';
@@ -290,24 +290,63 @@ function renderWeek(){
   if($('swap-hint')){$('swap-hint').oninput=e=>S.swap.hint=e.target.value;
     $('swap-hint').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();askSwap('own')}};
     $('swap-x').onclick=()=>{S.swap=null;renderWeek()};$('swap-3').onclick=()=>askSwap('three');$('swap-own').onclick=()=>askSwap('own');
+    $('swap-lib').onclick=()=>{S.swap.lib=!S.swap.lib;renderWeek()};
+    el.querySelectorAll('[data-picklib]').forEach(b=>b.onclick=()=>pickLib(b.dataset.picklib));
     el.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickSwap(+b.dataset.pick))}
+  el.querySelectorAll('[data-reqcancel]').forEach(b=>b.onclick=()=>write(()=>db.doc('meta/'+b.dataset.reqcancel).delete(),'Žádost zrušena.'));
+  el.querySelectorAll('[data-reqpick]').forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.reqpick.split('|');pickReq(id,+i)});
+}
+/* swap requests handled by Claude on the Pro plan (until the API is switched on) */
+function reqFor(date,slot){return (S.requests||[]).find(r=>r.date===date&&r.slot===slot&&r.status!=='done')}
+function optCard(r,key,attr){return `<div class="opt"><span class="thumb">${dish(r.look,key)}</span><div style="min-width:0"><h3>${esc(r.title)}</h3>
+    <div class="sub num">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active:''}${r.servings?' · '+r.servings+' porce':''}${r.batch?' · i na oběd další den':''}</div>
+    ${r.note?`<div class="mnote">${esc(r.note)}</div>`:''}<div class="row" style="margin-top:6px"><button class="btn primary" ${attr}>Vybrat</button>${r.sourceUrl?`<a class="link" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a>`:`<a class="link" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Jak to vypadá ↗</a>`}</div></div></div>`}
+function reqBox(date,slot){const q=reqFor(date,slot);if(!q)return '';
+  if(q.status==='ready'&&q.options?.length)return `<div class="swapbox"><div class="mnote"><b>Claude navrhuje:</b></div>${q.options.map((r,i)=>optCard(r,q.id+i,`data-reqpick="${esc(q.id)}|${i}"`)).join('')}<div class="row"><button class="btn ghost" data-reqcancel="${esc(q.id)}">Nechci nic z toho</button></div></div>`;
+  if(q.status==='error')return `<div class="swapbox"><div class="mnote">${esc(q.message||'Návrh se nepovedl.')}</div><button class="btn ghost" data-reqcancel="${esc(q.id)}">Zavřít</button></div>`;
+  return `<div class="swapbox"><div class="mnote">Čeká na návrhy od Clauda, obvykle do 2 hodin${q.hint?` · „${esc(q.hint)}“`:''}.</div><div class="row"><button class="btn ghost" data-reqcancel="${esc(q.id)}">Zrušit žádost</button></div></div>`}
+async function pickReq(id,i){const q=(S.requests||[]).find(r=>r.id===id);const r=q?.options?.[i];if(!r)return;
+  const di=S.plan.days.findIndex(d=>d.date===q.date);if(di<0){toast('Tento den už v plánu není.');return}
+  if(await applyPick(di,q.slot,cleanRecipeKeep(r),null))await write(()=>db.doc('meta/'+id).delete())}
+async function pickLib(rid){const sw=S.swap;const r=S.recipes.get(rid);if(!sw||!r)return;
+  if(await applyPick(sw.di,sw.slot,r,rid))S.swap=null}
+function cleanRecipeKeep(r){const c=cleanRecipe(r);if(r.sourceUrl)c.sourceUrl=String(r.sourceUrl);if(r.sourceLabel)c.sourceLabel=String(r.sourceLabel);return c}
+async function applyPick(di,slot,r,existingId){
+  const p=S.plan;const id=existingId||('r-'+Date.now().toString(36));
+  const days=JSON.parse(JSON.stringify(p.days));const d=days[di];const old=d[slot]||{};
+  d[slot]={title:r.title,recipeId:id,note:r.batch&&slot==='dinner'?'Uvařte víc, zbytek je zítřejší oběd.':''};
+  const next=days[di+1];
+  if(slot==='dinner'&&next){const nl=next.lunch||{};
+    const wasLeft=nl.leftover&&old.recipeId&&nl.recipeId===old.recipeId;
+    if(r.batch&&(wasLeft||!nl.recipeId))next.lunch={title:r.title,recipeId:id,note:'',leftover:true};
+    else if(!r.batch&&wasLeft)next.lunch={title:'Volný oběd – vyberte jídlo',recipeId:null,note:''};}
+  try{
+    if(!existingId)await db.doc('recipes/'+id).set({...r,source:r.source||'Claude – výměna jídla',createdAt:new Date().toISOString()});
+    await db.doc('meta/plan').update({days});
+    toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id);return true;
+  }catch(e){toast('Uložení se nepovedlo. Zkuste to znovu.');return false}
 }
 
 function recipeJSONSpec(){return 'Odpověz pouze JSON objektem v češtině: {"title":"název","batch":true,"servings":4,"time":35,"active":15,"tags":["rychlé","do krabičky"],"ingredients":[{"name":"kuřecí stehna","qty":"800 g"}],"steps":["krok 1","krok 2"],"note":"jedna věta: proč toto jídlo a s čím navazuje","look":{"vessel":"plate","base":"#e8c27a","pieces":["#b5562f","#e07a2f","#7a3b8f"],"garnish":"#4f8a3c"}}. time a active jsou minuty celkem a aktivně. look je náhled hotového jídla: vessel je plate, bowl, pan, tray nebo pot; base je barva hlavní části (omáčka, polévka, příloha); pieces jsou 3–5 barev hlavních surovin, jak vypadají uvařené; garnish je barva bylinek nebo null.'}
 function swapBox(){const sw=S.swap;const b=sw.busy;
-  let x=`<div class="swapbox"><button class="btn primary" id="swap-3" ${b?'disabled':''}>${b==='three'?'Claude vymýšlí 3 možnosti…':'Navrhni 3 možnosti'}</button>
+  let x=`<div class="swapbox"><button class="btn primary" id="swap-3" ${b?'disabled':''}>${b==='three'?'Claude vymýšlí 3 možnosti…':(sample?'Navrhni 3 možnosti':'Požádat Clauda o 3 návrhy')}</button>
     <div class="or">nebo podle sebe</div>
     <input type="text" id="swap-hint" placeholder="Např. rizoto s hlívou nebo něco s lososem" value="${esc(sw.hint||'')}" ${b?'disabled':''}>
-    <div class="row"><button class="btn" id="swap-own" ${b?'disabled':''}>${b==='own'?'Hledám recept…':'Najít recept'}</button><button class="btn ghost" id="swap-x">Zrušit</button></div>`;
+    <div class="row"><button class="btn" id="swap-own" ${b?'disabled':''}>${b==='own'?'Hledám recept…':(sample?'Najít recept':'Poslat Claudovi')}</button></div>
+    <div class="or">nebo hned</div>
+    <div class="row"><button class="btn" id="swap-lib" aria-expanded="${!!sw.lib}">Vybrat z uložených receptů</button><button class="btn ghost" id="swap-x">Zrušit</button></div>`;
   if(sw.msg)x+=`<div class="mnote">${esc(sw.msg)}</div>`;
-  (sw.options||[]).forEach((r,i)=>{x+=`<div class="opt"><span class="thumb">${dish(r.look,r.title+i)}</span><div style="min-width:0"><h3>${esc(r.title)}</h3>
-    <div class="sub num">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active:''}${r.servings?' · '+r.servings+' porce':''}${r.batch?' · i na oběd další den':''}</div>
-    ${r.note?`<div class="mnote">${esc(r.note)}</div>`:''}<div class="row" style="margin-top:6px"><button class="btn primary" data-pick="${i}" ${b?'disabled':''}>Vybrat</button><a class="link" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Jak to vypadá ↗</a></div></div></div>`});
+  if(sw.lib){const rs=[...S.recipes.entries()].filter(([,r])=>r.rating!=='down').sort((a,b)=>(b[1].fav?1:0)-(a[1].fav?1:0)||(b[1].rating==='up'?1:0)-(a[1].rating==='up'?1:0)||String(a[1].title).localeCompare(b[1].title,'cs'));
+    x+=rs.map(([id,r])=>optCard(r,id,`data-picklib="${esc(id)}"`)).join('')}
+  (sw.options||[]).forEach((r,i)=>{x+=optCard(r,r.title+i,`data-pick="${i}" ${b?'disabled':''}`)});
   return x+'</div>'}
 async function askSwap(mode){
   const sw=S.swap;if(!sw||sw.busy)return;
   if(mode==='own'&&!(sw.hint||'').trim()){sw.msg='Napište, na co máte chuť.';renderWeek();return}
   const p=S.plan;const d=p.days[sw.di];const old=d[sw.slot]||{};
+  if(!sample){const id='req-'+Date.now().toString(36);
+    const ok=await write(()=>db.doc('meta/'+id).set({type:'swap',mode,date:d.date,slot:sw.slot,oldTitle:old.title||'',hint:(sw.hint||'').trim(),status:'waiting',createdAt:new Date().toISOString()}));
+    if(ok){S.swap=null;toast('Posláno Claudovi. Návrhy se objeví u tohoto jídla.');renderWeek()}return}
   sw.busy=mode;sw.msg='';sw.options=null;renderWeek();
   const pr=S.profile||{};
   const others=p.days.flatMap(x=>[x.lunch?.title,x.dinner?.title]).filter(Boolean).join('; ');
@@ -346,19 +385,7 @@ Odpověz pouze JSON polem s jedním objektem: ${recipeJSONSpec()}`;
 }
 async function pickSwap(i){
   const sw=S.swap;const r=sw?.options?.[i];if(!r||sw.busy)return;sw.busy='pick';renderWeek();
-  const p=S.plan;const id='r-'+Date.now().toString(36);
-  const days=JSON.parse(JSON.stringify(p.days));const d=days[sw.di];const old=d[sw.slot]||{};
-  d[sw.slot]={title:r.title,recipeId:id,note:r.batch&&sw.slot==='dinner'?'Uvařte víc, zbytek je zítřejší oběd.':''};
-  const next=days[sw.di+1];
-  if(sw.slot==='dinner'&&next){const nl=next.lunch||{};
-    const wasLeft=nl.leftover&&old.recipeId&&nl.recipeId===old.recipeId;
-    if(r.batch&&(wasLeft||!nl.recipeId))next.lunch={title:r.title,recipeId:id,note:'',leftover:true};
-    else if(!r.batch&&wasLeft)next.lunch={title:'Volný oběd – vyberte jídlo',recipeId:null,note:''};}
-  try{
-    await db.doc('recipes/'+id).set({...r,source:'Claude – výměna jídla',createdAt:new Date().toISOString()});
-    await db.doc('meta/plan').update({days});
-    S.swap=null;toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id);
-  }catch(e){sw.busy=false;sw.msg=sampleMsg(e);renderWeek()}
+  if(await applyPick(sw.di,sw.slot,r,null))S.swap=null;else{sw.busy=false;renderWeek()}
 }
 function sampleMsg(e){const c=e?.code;
   if(c==='not_granted'||c==='sampling_disabled')return 'Claude tady nemá povolení. Povolte ho v dialogu, který se objeví při dalším pokusu po znovunačtení.';

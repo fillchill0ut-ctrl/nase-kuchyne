@@ -22,6 +22,7 @@ function loadCache() {
 function applyMem() {
   S.items = [...MEM.items].map(([id, d]) => ({ id, ...d }));
   S.recipes = new Map(MEM.recipes);
+  S.requests = [...MEM.docs].filter(([id]) => id.startsWith('req-')).map(([id, v]) => ({ id, ...v }));
   S.plan = MEM.docs.get('plan') || null; S.profile = MEM.docs.get('profile') || null; S.deals = MEM.docs.get('deals') || null;
   S.loaded = { items: true, plan: true, recipes: true };
   render();
