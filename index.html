@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Naše kuchyně</title>
+<meta name="theme-color" content="#f2f4ef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kuchyně">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-column phone app, sticky header, bottom tab bar; shelf-tag yellow marks sale prices, herb green is the action colour */
+:root{
+  --bg:#f2f4ef; --surface:#ffffff; --ink:#1c231f; --muted:#5b6861; --line:#d9e0d8; --soft:#e6ece4;
+  --accent:#2d5b44; --accent-ink:#ffffff; --tag:#ffd426; --tag-ink:#2a2200; --sale:#c3261c; --good:#2d7a4f; --bad:#b4442f;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --r:12px; color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;margin:0;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:env(safe-area-inset-top, 0px) calc(88px + env(safe-area-inset-bottom, 0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--bg)}
+.wrap{max-width:640px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top, 0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.01em;margin:0}
+.sub{color:var(--muted);font-size:14px}
+h2{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.1;margin:18px 0 4px;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.55;cursor:default}
+.link{background:none;border:0;padding:0;color:var(--accent);font-weight:600;font-size:14px}
+input[type=text],input[type=search],select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+textarea{min-height:76px;resize:vertical}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.stat{background:var(--soft);border-radius:var(--r);padding:10px 12px}
+.stat b{display:block;font-family:var(--f-display);font-size:22px;font-weight:800}
+.stat span{font-size:13px;color:var(--muted)}
+/* week */
+.day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.day.today{border-color:var(--accent)}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;background:var(--soft)}
+.dayhead .note{font-size:13px;color:var(--muted)}
+.meal{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:10px 14px;border-top:1px solid var(--line);align-items:start}
+.thumb{display:block;width:64px;height:64px;border-radius:12px;overflow:hidden;background:var(--soft);border:0;padding:0}
+.thumb svg,.thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.rcard{display:grid!important;grid-template-columns:72px 1fr;gap:12px;align-items:center}
+.rcard .thumb{width:72px;height:72px}
+.hero{width:100%;max-width:360px;aspect-ratio:1;border-radius:20px;overflow:hidden;background:var(--soft);margin:0 auto}
+.hero svg,.hero img{display:block;width:100%;height:100%;object-fit:cover}
+.meal:first-of-type{border-top:0}
+.slot{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
+.mtitle{background:none;border:0;padding:0;text-align:left;font-weight:600;font-size:16px;color:var(--ink)}
+.mtitle.has{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.mnote{font-size:13px;color:var(--muted);margin-top:2px}
+.leftover{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin-right:6px}
+.swapbox{margin-top:10px;display:flex;flex-direction:column;gap:8px;background:var(--soft);border-radius:var(--r);padding:12px}
+.or{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center}
+.opt{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.opt h3{font-size:16px}
+.opt .btn{justify-self:start}
+a.btn{text-decoration:none;color:var(--ink);display:inline-block}
+.shop{border-left:3px solid var(--tag);padding:2px 0 2px 12px}
+/* shopping */
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:600}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.group h3{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 6px}
+.group h3 small{font-family:var(--f-body);font-weight:400;font-size:13px;color:var(--muted)}
+.items{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.item{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);margin:0}
+.iname{background:none;border:0;padding:0;text-align:left;min-width:0}
+.iname b{font-weight:600}
+.iname .q{color:var(--muted);font-size:14px}
+.item.done .iname b{text-decoration:line-through;color:var(--muted)}
+.item.done .tagp{opacity:.45}
+.tagp{text-align:right;font-variant-numeric:tabular-nums;line-height:1.15}
+.tagp .p{display:inline-block;font-weight:700;font-size:14px;padding:2px 6px;border-radius:4px}
+.tagp .p.sale{background:var(--tag);color:var(--tag-ink)}
+.tagp s{display:block;font-size:12px;color:var(--muted)}
+.edit{display:grid;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--soft)}
+.edit .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.addform{display:grid;grid-template-columns:1fr 120px;gap:8px}
+.addform .full{grid-column:1/-1}
+/* recipes */
+.rcard{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.rcard h3{margin-bottom:4px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:12px;font-weight:600;background:var(--soft);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow-y:auto;
+  padding:calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
+.sheet ol{padding-left:22px;display:flex;flex-direction:column;gap:10px}
+.ing{list-style:none;padding:0;margin:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.ing li{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;border-top:1px solid var(--line)}
+.ing li:first-child{border-top:0}
+.ing li span:last-child{color:var(--muted);text-align:right}
+.rate[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* nav */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(4,1fr);
+  padding:6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px))}
+nav.tabs button{background:none;border:0;padding:8px 4px;border-radius:10px;font-weight:700;font-size:13px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav.tabs button[aria-current=page]{color:var(--accent);background:var(--soft)}
+.badge{font-variant-numeric:tabular-nums}
+.empty{padding:24px 14px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:var(--r)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom, 0px));z-index:30;background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:14px;max-width:calc(100% - 32px)}
+details summary{cursor:pointer;font-weight:600}
+table.deals{width:100%;border-collapse:collapse;font-size:14px}
+table.deals td{padding:6px 4px;border-top:1px solid var(--line);vertical-align:top}
+table.deals td.r{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto}
+.login{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px))}
+.login form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px}
+.login img{width:88px;height:88px;border-radius:22px}
+input[type=email],input[type=password]{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form id="login-form">
+    <img src="icons/icon-192.png" alt="">
+    <h2 style="margin:0">Naše kuchyně</h2>
+    <p class="sub" style="margin:0">Přihlaste se e-mailem a heslem, které máte v Supabase.</p>
+    <input type="email" id="login-email" autocomplete="username" placeholder="E-mail" required>
+    <input type="password" id="login-pass" autocomplete="current-password" placeholder="Heslo" required>
+    <button class="btn primary" type="submit" style="padding:11px">Přihlásit</button>
+    <p class="sub" id="login-msg" style="margin:0"></p>
+  </form>
+</div>
+
+<div class="wrap">
+
+    <header class="top">
+    <p class="brand">Naše kuchyně</p>
+    <span class="sub" id="hdr"></span>
+  </header>
+<main>
+    <section id="v-tyden"></section>
+
+    <section id="v-nakup" hidden>
+      <h2>Nákupní seznam</h2>
+      <p class="sub" id="nak-sum">Načítám seznam…</p>
+      <div class="chips" id="nak-chips" role="group" aria-label="Filtr obchodu"></div>
+      <div id="nak-list"></div>
+      <div class="panel stack" style="margin-top:16px">
+        <h3>Přidat položku</h3>
+        <form class="addform" id="addform">
+          <input type="text" id="add-name" placeholder="Např. máslo" aria-label="Název" required>
+          <input type="text" id="add-qty" placeholder="Množství" aria-label="Množství">
+          <select id="add-store" class="full" aria-label="Obchod"></select>
+          <button class="btn primary full" type="submit">Přidat na seznam</button>
+        </form>
+        <div class="row"><button class="btn ghost" id="clear-done" type="button">Smazat odškrtnuté</button></div>
+      </div>
+    </section>
+
+    <section id="v-recepty" hidden>
+      <h2>Recepty</h2>
+      <p class="sub">Jídla z plánů a vaše vlastní. Klepněte pro postup.</p>
+      <input type="search" id="r-q" placeholder="Hledat recept nebo surovinu" aria-label="Hledat recept" style="margin:10px 0 8px">
+      <div class="chips" id="r-chips" role="group" aria-label="Filtr receptů" style="margin-bottom:10px"></div>
+      <div class="stack" id="r-list"></div>
+      <div class="panel stack" style="margin-top:16px">
+        <h3>Přidat recept</h3>
+        <p class="sub" style="margin:0">Vložte text receptu z webu (suroviny a postup). Claude ho převede do přehledné podoby.</p>
+        <textarea id="r-paste" placeholder="Vložte text receptu…"></textarea>
+        <input type="text" id="r-src" placeholder="Odkaz na zdroj (nepovinné)">
+        <div class="row"><button class="btn primary" id="r-add" type="button">Uložit recept</button><span class="sub" id="r-status"></span></div>
+      </div>
+    </section>
+
+    <section id="v-profil" hidden>
+      <h2>Profil chutí</h2>
+      <p class="sub">Podle tohoto profilu Claude každý týden skládá plán. Pište volně, celými větami.</p>
+      <form class="stack" id="pform" style="margin-top:12px">
+        <label class="stack" style="gap:4px"><span class="eyebrow">Co máme rádi</span><textarea id="p-likes"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Čemu se vyhnout</span><textarea id="p-avoid"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Typy jídel a cíle</span><textarea id="p-goals"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Rozpočet a čas</span><textarea id="p-budget"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Obchody</span><textarea id="p-stores"></textarea></label>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Weby s recepty</span><textarea id="p-sites"></textarea></label>
+        <div class="panel stack" id="p-learned-box" hidden style="gap:6px"><span class="eyebrow">Co se Claude naučil z vašich hodnocení</span><p id="p-learned" style="margin:0;max-width:60ch"></p></div>
+        <label class="stack" style="gap:4px"><span class="eyebrow">Vzkaz pro příští plán</span><textarea id="p-notes" placeholder="Např. příští týden máme návštěvu v sobotu"></textarea></label>
+        <div class="row"><button class="btn primary" type="submit">Uložit profil</button><span class="sub" id="p-status"></span></div>
+      </form>
+      <div class="panel row" style="margin-top:20px;justify-content:space-between"><span class="sub">Přihlášen: <b id="who"></b></span><button class="btn ghost" id="logout" type="button">Odhlásit</button></div>
+    </section>
+  </main>
+</div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+<div class="toast" id="toast" hidden></div>
+
+<nav class="tabs" aria-label="Sekce">
+  <button data-v="tyden"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Týden</button>
+  <button data-v="nakup"><svg viewBox="0 0 24 24"><path d="M4 5h2l2 11h10l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/></svg><span>Nákup <span class="badge" id="badge"></span></span></button>
+  <button data-v="recepty"><svg viewBox="0 0 24 24"><path d="M6 3.5h10a2 2 0 0 1 2 2v15H8a2 2 0 0 1-2-2z"/><path d="M6 18.5a2 2 0 0 1 2-2h10M10 8h5M10 11h4"/></svg>Recepty</button>
+  <button data-v="profil"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5"/></svg>Profil</button>
+</nav>
+
+<script>
+const VIEWS=['tyden','nakup','recepty','profil'];
+const CATS=['Maso a ryby','Zelenina a ovoce','Mléčné a vejce','Spíž','Pečivo','Ostatní'];
+const STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
+const SLOTN={lunch:'Oběd',dinner:'Večeře',dessert:'Moučník'};
+const DAYN=['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
+const S={items:[],recipes:new Map(),plan:null,profile:null,deals:null,loaded:{items:false,plan:false,recipes:false},
+  view:'tyden',filter:'Vše',rf:'Vše',editing:null,openRecipe:null,swap:null,q:''};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const kc=n=>n==null||n===''?'':Number(n).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč';
+const kcRound=n=>Math.round(n).toLocaleString('cs-CZ')+' Kč';
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2600)}
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dateLabel(iso){const [y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d);return {name:DAYN[dt.getDay()],short:d+'. '+m+'.'}}
+
+/* ---------- navigation ---------- */
+function show(v){if(!VIEWS.includes(v))v='tyden';S.view=v;
+  VIEWS.forEach(x=>{$('v-'+x).hidden=x!==v});
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===v?'page':'false'));
+  try{history.replaceState(null,'','#'+v)}catch(e){}
+  window.scrollTo(0,0);render();}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+/* ---------- week ---------- */
+function renderWeek(){
+  const el=$('v-tyden');const p=S.plan;
+  if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
+  if(!p){el.innerHTML='<h2>Tento týden</h2><div class="empty">Plán na tento týden ještě není. Claude ho připraví po vydání nových letáků a objeví se tady i s nákupním seznamem.</div>';return}
+  const today=todayISO();
+  const open=S.items.filter(i=>!i.checked);
+  const est=S.items.reduce((a,i)=>a+(Number(i.price)||0),0);
+  let h=`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
+  if(p.summary)h+=`<p class="sub" style="max-width:60ch">${esc(p.summary)}</p>`;
+  h+=`<div class="summary"><div class="stat"><b class="num">${kcRound(est)}</b><span>odhad nákupu z ${kcRound(p.budget?.limit||2000)}</span></div>
+      <div class="stat"><b class="num">${open.length}</b><span>položek zbývá koupit</span></div></div>`;
+  if(p.shops?.length){h+=`<div class="stack" style="margin-top:16px"><p class="eyebrow" style="margin:0">Kdy nakoupit</p>`;
+    p.shops.forEach(s=>{h+=`<div class="shop"><h3>${esc(s.title)} · ${esc(s.when)}</h3><div class="sub">${esc(s.stores||'')}</div>${s.note?`<div class="mnote">${esc(s.note)}</div>`:''}</div>`});h+='</div>'}
+  h+=`<div class="stack" style="margin-top:18px">`;
+  (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
+    h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3>${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;
+    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
+      const sw=S.swap&&S.swap.di===di&&S.swap.slot===slot;
+      const rr=has?S.recipes.get(m.recipeId):null;
+      h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
+        ${m.leftover?'<span class="leftover">Zbytek</span>':''}
+        <button class="mtitle${has?' has':''}" data-open="${esc(m.recipeId||'')}" ${has?'':'disabled'}>${esc(m.title||'—')}</button>
+        ${m.note?`<div class="mnote">${esc(m.note)}</div>`:''}
+        ${rr?.sourceUrl?`<div style="margin-top:3px"><a class="link" href="${esc(rr.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a></div>`:''}
+        ${sample&&!sw?`<div class="row" style="margin-top:4px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button></div>`:''}
+        ${sw?swapBox():''}
+      </div></div>`});
+    h+='</article>'});
+  h+='</div>';
+  const dl=S.deals;
+  if(dl?.items?.length){h+=`<details class="panel" style="margin-top:18px"><summary>Akce, ze kterých plán vychází (${dl.items.length})</summary>
+    ${dl.note?`<p class="sub">${esc(dl.note)}</p>`:''}<div class="scroll"><table class="deals"><tbody>`;
+    dl.items.forEach(x=>{h+=`<tr><td><b>${esc(x.name)}</b><div class="sub">${esc(x.store)} · do ${esc(x.until||'')}</div></td><td class="r num"><span class="tagp"><span class="p sale">${esc(x.price)}</span>${x.regular?`<s>${esc(x.regular)}</s>`:''}</span></td></tr>`});
+    h+='</tbody></table></div>';
+    if(dl.season?.length)h+=`<p class="sub" style="margin-bottom:0"><b>Sezóna teď:</b> ${esc(dl.season.join(', '))}</p>`;
+    h+='</details>'}
+  el.innerHTML=h;
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
+  el.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.swap.split('|');S.swap={di:+di,slot,hint:'',busy:false,msg:''};renderWeek();$('swap-hint')?.focus()});
+  if($('swap-hint')){$('swap-hint').oninput=e=>S.swap.hint=e.target.value;
+    $('swap-hint').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();askSwap('own')}};
+    $('swap-x').onclick=()=>{S.swap=null;renderWeek()};$('swap-3').onclick=()=>askSwap('three');$('swap-own').onclick=()=>askSwap('own');
+    el.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickSwap(+b.dataset.pick))}
+}
+
+function recipeJSONSpec(){return 'Odpověz pouze JSON objektem v češtině: {"title":"název","batch":true,"servings":4,"time":35,"active":15,"tags":["rychlé","do krabičky"],"ingredients":[{"name":"kuřecí stehna","qty":"800 g"}],"steps":["krok 1","krok 2"],"note":"jedna věta: proč toto jídlo a s čím navazuje","look":{"vessel":"plate","base":"#e8c27a","pieces":["#b5562f","#e07a2f","#7a3b8f"],"garnish":"#4f8a3c"}}. time a active jsou minuty celkem a aktivně. look je náhled hotového jídla: vessel je plate, bowl, pan, tray nebo pot; base je barva hlavní části (omáčka, polévka, příloha); pieces jsou 3–5 barev hlavních surovin, jak vypadají uvařené; garnish je barva bylinek nebo null.'}
+function swapBox(){const sw=S.swap;const b=sw.busy;
+  let x=`<div class="swapbox"><button class="btn primary" id="swap-3" ${b?'disabled':''}>${b==='three'?'Claude vymýšlí 3 možnosti…':'Navrhni 3 možnosti'}</button>
+    <div class="or">nebo podle sebe</div>
+    <input type="text" id="swap-hint" placeholder="Např. rizoto s hlívou nebo něco s lososem" value="${esc(sw.hint||'')}" ${b?'disabled':''}>
+    <div class="row"><button class="btn" id="swap-own" ${b?'disabled':''}>${b==='own'?'Hledám recept…':'Najít recept'}</button><button class="btn ghost" id="swap-x">Zrušit</button></div>`;
+  if(sw.msg)x+=`<div class="mnote">${esc(sw.msg)}</div>`;
+  (sw.options||[]).forEach((r,i)=>{x+=`<div class="opt"><span class="thumb">${dish(r.look,r.title+i)}</span><div style="min-width:0"><h3>${esc(r.title)}</h3>
+    <div class="sub num">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active:''}${r.servings?' · '+r.servings+' porce':''}${r.batch?' · i na oběd další den':''}</div>
+    ${r.note?`<div class="mnote">${esc(r.note)}</div>`:''}<div class="row" style="margin-top:6px"><button class="btn primary" data-pick="${i}" ${b?'disabled':''}>Vybrat</button><a class="link" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Jak to vypadá ↗</a></div></div></div>`});
+  return x+'</div>'}
+async function askSwap(mode){
+  const sw=S.swap;if(!sw||sw.busy)return;
+  if(mode==='own'&&!(sw.hint||'').trim()){sw.msg='Napište, na co máte chuť.';renderWeek();return}
+  const p=S.plan;const d=p.days[sw.di];const old=d[sw.slot]||{};
+  sw.busy=mode;sw.msg='';sw.options=null;renderWeek();
+  const pr=S.profile||{};
+  const others=p.days.flatMap(x=>[x.lunch?.title,x.dinner?.title]).filter(Boolean).join('; ');
+  const deals=(S.deals?.items||[]).slice(0,40).map(x=>`${x.name} (${x.store}) ${x.price}`).join('\n');
+  const rv=[...S.recipes.values()];const liked=rv.filter(x=>x.fav||x.rating==='up').map(x=>x.title).slice(0,15).join('; ');const disliked=rv.filter(x=>x.rating==='down').map(x=>x.title).slice(0,15).join('; ');
+  const L=dateLabel(d.date);const weekend=[0,6].includes(new Date(d.date+'T12:00').getDay())||/svátek/i.test(d.note||'');
+  const ctx=`Jídlo je ${SLOTN[sw.slot].toLowerCase()} na ${L.name} ${L.short}${old.title?`, místo "${old.title}"`:''}.
+Profil:
+Máme rádi: ${pr.likes||''}
+Vyhnout se: ${pr.avoid||''}
+Typy a cíle: ${pr.goals||''}
+Rozpočet a čas: ${pr.budget||''}
+Chutnalo / oblíbené: ${liked||'zatím nic'}
+Nechutnalo (vyhni se podobnému): ${disliked||'zatím nic'}
+${pr.learned?'Co o nich víme: '+pr.learned:''}
+Akce tento týden:
+${deals}
+Ostatní jídla v týdnu: ${others}
+Pravidla: real food, žádné ultrazpracované potraviny. ${weekend?'Je víkend nebo volno, může to být náročnější.':'Je všední den: nejvýš 40 minut celkem a 20 minut aktivně.'} Porce: večeře pro 3 (dva dospělí a tříleté dítě), oběd ve všední den pro 2 dospělé (syn je ve školce), o víkendu a ve svátek oběd pro 3, moučník na 6–8 kousků. U večeře: pokud se jídlo dá jednoduše uvařit ve větším množství a dobře se ohřívá, dej batch:true a servings 5 (3 večeře + 2 zítřejší oběd, o víkendu 6); jinak batch:false a servings 3. Polévka sama jako hlavní jídlo nestačí: ve všední den k ní přidej druhou část (chléb s pomazánkou, toast se sýrem…) a zapiš ji do surovin i kroků, nebo ji navrhni jen o víkendu. Využij suroviny z akcí a z ostatních jídel týdne.`;
+  const prompt=mode==='three'
+    ?`Jsi kuchař a plánovač jídel pro pár. Navrhni 3 RŮZNÉ varianty jídla, ze kterých si vyberou. Ať se liší hlavní surovinou nebo stylem (třeba jedna co nejrychlejší, jedna z akcí${sw.slot==='dinner'?', jedna studená jednoduchá večeře jako pomazánka s chlebem a zeleninou':', jedna lehčí nebo bez masa'}). Vše musí být vhodné i pro tříleté dítě (bez ostrého koření, chilli zvlášť).
+${ctx}
+Odpověz pouze JSON polem 3 objektů. Každý objekt: ${recipeJSONSpec()}`
+    :`Jsi kuchař. Pár chce uvařit: "${sw.hint.trim()}". Sestav na to jeden spolehlivý recept v duchu českých moderních receptových webů, přizpůsobený jejich profilu a pravidlům.
+${ctx}
+Odpověz pouze JSON polem s jedním objektem: ${recipeJSONSpec()}`;
+  try{
+    let r=await sample.json(prompt,{cache:false});
+    if(!Array.isArray(r))r=[r];
+    r=r.filter(x=>x&&x.title&&Array.isArray(x.ingredients)).slice(0,3);
+    if(!r.length)throw {code:'invalid_json'};
+    sw.options=r.map(x=>({...cleanRecipe(x),batch:!!x.batch}));sw.busy=false;
+    if(mode==='own'&&sw.options.length===1)sw.msg='Tohle jsem našel. Vyhovuje?';
+  }catch(e){sw.busy=false;sw.msg=sampleMsg(e)}
+  renderWeek();
+}
+async function pickSwap(i){
+  const sw=S.swap;const r=sw?.options?.[i];if(!r||sw.busy)return;sw.busy='pick';renderWeek();
+  const p=S.plan;const id='r-'+Date.now().toString(36);
+  const days=JSON.parse(JSON.stringify(p.days));const d=days[sw.di];const old=d[sw.slot]||{};
+  d[sw.slot]={title:r.title,recipeId:id,note:r.batch&&sw.slot==='dinner'?'Uvařte víc, zbytek je zítřejší oběd.':''};
+  const next=days[sw.di+1];
+  if(sw.slot==='dinner'&&next){const nl=next.lunch||{};
+    const wasLeft=nl.leftover&&old.recipeId&&nl.recipeId===old.recipeId;
+    if(r.batch&&(wasLeft||!nl.recipeId))next.lunch={title:r.title,recipeId:id,note:'',leftover:true};
+    else if(!r.batch&&wasLeft)next.lunch={title:'Volný oběd – vyberte jídlo',recipeId:null,note:''};}
+  try{
+    await db.doc('recipes/'+id).set({...r,source:'Claude – výměna jídla',createdAt:new Date().toISOString()});
+    await db.doc('meta/plan').update({days});
+    S.swap=null;toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id);
+  }catch(e){sw.busy=false;sw.msg=sampleMsg(e);renderWeek()}
+}
+function sampleMsg(e){const c=e?.code;
+  if(c==='not_granted'||c==='sampling_disabled')return 'Claude tady nemá povolení. Povolte ho v dialogu, který se objeví při dalším pokusu po znovunačtení.';
+  if(c==='rate_limited')return 'Teď je toho moc najednou. Zkuste to za chvíli.';
+  if(c==='invalid_json')return 'Odpověď nešla přečíst. Zkuste to znovu.';
+  if(c==='invalid_argument')return 'Tuto změnu nemůžete uložit. Požádejte o přístup Editor.';
+  return 'Nepovedlo se. Zkuste to znovu.'}
+function cleanRecipe(r){return {title:String(r.title).slice(0,120),servings:Number(r.servings)||null,time:Number(r.time)||null,active:Number(r.active)||null,
+  tags:(r.tags||[]).map(String).slice(0,6),ingredients:(r.ingredients||[]).map(i=>({name:String(i.name||''),qty:String(i.qty||'')})).filter(i=>i.name).slice(0,40),
+  steps:(r.steps||[]).map(String).slice(0,20),note:String(r.note||''),look:cleanLook(r.look),batch:!!r.batch,fav:false,rating:null}}
+const HEX=/^#[0-9a-fA-F]{6}$/;
+function cleanLook(l){if(!l||typeof l!=='object')return null;return {vessel:['plate','bowl','pan','tray','pot'].includes(l.vessel)?l.vessel:'plate',base:HEX.test(l.base)?l.base:'#d9b779',pieces:(l.pieces||[]).filter(c=>HEX.test(c)).slice(0,5),garnish:HEX.test(l.garnish)?l.garnish:null}}
+/* dish illustration: vessel + base + scattered pieces, seeded by recipe id */
+function seed(str){let h=2166136261;for(const c of String(str))h=Math.imul(h^c.charCodeAt(0),16777619);return ()=>{h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);return ((h^=h>>>16)>>>0)/4294967296}}
+function pic(r,id){if(r.photo){const u=photoUrl(r.photo);if(u)return `<img src="${esc(u)}" alt="${esc(r.title)}" loading="lazy">`}return dish(r.look,id||r.title)}
+function dish(look,key){const L=cleanLook(look)||{vessel:'plate',base:'#d9b779',pieces:['#b5562f','#e8a33d','#6b8f3c'],garnish:'#4f8a3c'};const rnd=seed(key);
+  const V={plate:['#f3f2ee','#e2e0da',44],bowl:['#e9e4dc','#c9c1b4',40],pan:['#3a3c3e','#232526',42],tray:['#8b9196','#6b7176',0],pot:['#b9bec2','#8e9499',40]}[L.vessel];
+  let s=`<svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" fill="${L.vessel==='tray'?'#e6dccb':'#e9e3d6'}"/>`;
+  if(L.vessel==='pan')s+=`<rect x="84" y="45" width="18" height="10" rx="4" fill="#232526"/>`;
+  if(L.vessel==='pot')s+=`<rect x="1" y="45" width="10" height="10" rx="3" fill="#8e9499"/><rect x="89" y="45" width="10" height="10" rx="3" fill="#8e9499"/>`;
+  if(L.vessel==='tray')s+=`<rect x="8" y="16" width="84" height="68" rx="8" fill="${V[1]}"/><rect x="12" y="20" width="76" height="60" rx="6" fill="${V[0]}"/><rect x="15" y="23" width="70" height="54" rx="5" fill="${L.base}" opacity=".85"/>`;
+  else{s+=`<circle cx="50" cy="50" r="${V[2]}" fill="${V[1]}"/><circle cx="50" cy="50" r="${V[2]-4}" fill="${V[0]}"/>`;
+    const br=L.vessel==='plate'?27:V[2]-7;s+=`<circle cx="${L.vessel==='plate'?48:50}" cy="${L.vessel==='plate'?52:50}" r="${br}" fill="${L.base}"/>`}
+  const P=L.pieces.length?L.pieces:['#b5562f'];const n=L.vessel==='bowl'||L.vessel==='pot'?9:13;
+  for(let i=0;i<n;i++){const a=rnd()*Math.PI*2,d=Math.sqrt(rnd())*(L.vessel==='tray'?26:23);const x=50+Math.cos(a)*d*(L.vessel==='tray'?1.25:1),y=50+Math.sin(a)*d*(L.vessel==='tray'?0.9:1);
+    const c=P[i%P.length],rx=3+rnd()*5,ry=2.5+rnd()*3.5,rot=Math.round(rnd()*180);
+    s+=`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" transform="rotate(${rot} ${x.toFixed(1)} ${y.toFixed(1)})" fill="${c}"/>`}
+  if(L.garnish)for(let i=0;i<10;i++){const a=rnd()*Math.PI*2,d=Math.sqrt(rnd())*24;s+=`<circle cx="${(50+Math.cos(a)*d).toFixed(1)}" cy="${(50+Math.sin(a)*d).toFixed(1)}" r="${(0.9+rnd()*1.1).toFixed(1)}" fill="${L.garnish}"/>`}
+  return s+'<ellipse cx="38" cy="34" rx="10" ry="4" fill="#fff" opacity=".18" transform="rotate(-30 38 34)"/></svg>'}
+
+/* ---------- shopping ---------- */
+function sortItems(a,b){return (a.trip||1)-(b.trip||1)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||CATS.indexOf(a.cat)-CATS.indexOf(b.cat)||(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,'cs')}
+function renderShop(){
+  const all=S.items;const open=all.filter(i=>!i.checked);
+  $('badge').textContent=open.length?`(${open.length})`:'';
+  if(S.view!=='nakup')return;
+  const sumOpen=open.reduce((a,i)=>a+(Number(i.price)||0),0);
+  $('nak-sum').textContent=!S.loaded.items?'Načítám seznam…':all.length?`Zbývá ${open.length} z ${all.length} položek · zbývá zhruba ${kcRound(sumOpen)}`:'Seznam je prázdný.';
+  const stores=[...new Set(all.map(i=>i.store||'Kdekoli'))].sort((a,b)=>STORES.indexOf(a)-STORES.indexOf(b));
+  const hasTrip2=all.some(i=>i.trip===2);
+  const filters=['Vše',...stores,...(hasTrip2?['2. nákup']:[])];
+  if(!filters.includes(S.filter))S.filter='Vše';
+  $('nak-chips').innerHTML=filters.map(f=>`<button class="chip" aria-pressed="${f===S.filter}" data-f="${esc(f)}">${esc(f)}</button>`).join('');
+  $('nak-chips').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;renderShop()});
+  let list=all.filter(i=>S.filter==='Vše'||(S.filter==='2. nákup'?i.trip===2:(i.store||'Kdekoli')===S.filter));
+  list.sort((a,b)=>(a.checked?1:0)-(b.checked?1:0)||sortItems(a,b));
+  if(!all.length&&S.loaded.items){$('nak-list').innerHTML='<div class="empty" style="margin-top:12px">Zatím tu nic není. Přidejte první položku níže, nebo počkejte na týdenní plán.</div>';return}
+  const groups=new Map();
+  list.forEach(i=>{const k=i.checked?'Koupeno':((i.trip===2?'2. nákup · ':'')+(i.store||'Kdekoli'));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(i)});
+  let h='';
+  groups.forEach((arr,k)=>{const s=arr.reduce((a,i)=>a+(Number(i.price)||0),0);
+    h+=`<div class="group"><h3>${esc(k)} <small class="num">${arr.length} ${s?'· '+kcRound(s):''}</small></h3><div class="items">`;
+    arr.forEach(i=>{
+      h+=`<div class="item${i.checked?' done':''}"><input type="checkbox" ${i.checked?'checked':''} data-chk="${esc(i.id)}" aria-label="Koupeno: ${esc(i.name)}">
+        <button class="iname" data-ed="${esc(i.id)}"><b>${esc(i.name)}</b> ${i.qty?`<span class="q">${esc(i.qty)}</span>`:''}${i.note?`<div class="mnote">${esc(i.note)}</div>`:''}</button>
+        <span class="tagp">${i.price!=null&&i.price!==''?`<span class="p${i.sale?' sale':''}">${kc(i.price)}</span>`:''}${i.sale&&i.regular?`<s>${kc(i.regular)}</s>`:''}</span></div>`;
+      if(S.editing===i.id)h+=`<form class="edit" data-form="${esc(i.id)}"><input type="text" id="e-name" value="${esc(i.name)}" aria-label="Název">
+        <div class="two"><input type="text" id="e-qty" value="${esc(i.qty||'')}" placeholder="Množství" aria-label="Množství"><select id="e-store" aria-label="Obchod">${STORES.map(s=>`<option ${s===(i.store||'Kdekoli')?'selected':''}>${s}</option>`).join('')}</select></div>
+        <input type="text" id="e-note" value="${esc(i.note||'')}" placeholder="Poznámka" aria-label="Poznámka">
+        <div class="row"><button class="btn primary" type="submit">Uložit</button><button class="btn ghost" type="button" data-cancel>Zavřít</button><button class="btn ghost" type="button" data-del="${esc(i.id)}" style="margin-left:auto;color:var(--bad)">Smazat</button></div></form>`;
+    });
+    h+='</div></div>'});
+  $('nak-list').innerHTML=h;
+  $('nak-list').querySelectorAll('[data-chk]').forEach(c=>c.onchange=()=>write(()=>db.doc('items/'+c.dataset.chk).update({checked:c.checked})));
+  $('nak-list').querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{S.editing=S.editing===b.dataset.ed?null:b.dataset.ed;renderShop()});
+  const f=$('nak-list').querySelector('[data-form]');
+  if(f){f.onsubmit=e=>{e.preventDefault();const id=f.dataset.form;const upd={name:$('e-name').value.trim()||'Položka',qty:$('e-qty').value.trim(),store:$('e-store').value,note:$('e-note').value.trim()};S.editing=null;write(()=>db.doc('items/'+id).update(upd));renderShop()};
+    f.querySelector('[data-cancel]').onclick=()=>{S.editing=null;renderShop()};
+    f.querySelector('[data-del]').onclick=e=>{const id=e.target.dataset.del;S.editing=null;write(()=>db.doc('items/'+id).delete());renderShop()}}
+}
+async function write(fn,ok){if(!db){toast('Data se nepodařilo načíst.');return false}
+  try{await fn();if(ok)toast(ok);return true}catch(e){toast(e?.code==='invalid_argument'?'Nemáte oprávnění tuto změnu uložit.':'Uložení se nepovedlo. Zkuste to znovu.');return false}}
+$('add-store').innerHTML=STORES.map(s=>`<option ${s==='Kdekoli'?'selected':''}>${s}</option>`).join('');
+$('addform').onsubmit=async e=>{e.preventDefault();const name=$('add-name').value.trim();if(!name)return;
+  const ok=await write(()=>db.collection('items').add({name,qty:$('add-qty').value.trim(),store:$('add-store').value,cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',trip:1,order:Date.now()}));
+  if(ok){$('add-name').value='';$('add-qty').value='';$('add-name').focus()}};
+$('clear-done').onclick=async()=>{const done=S.items.filter(i=>i.checked);if(!done.length){toast('Nic odškrtnutého.');return}
+  for(const i of done){if(!await write(()=>db.doc('items/'+i.id).delete()))return}toast('Odškrtnuté položky smazány.')};
+
+/* ---------- recipes ---------- */
+function renderRecipes(){
+  if(S.view!=='recepty')return;
+  const q=S.q.toLowerCase();
+  let rs=[...S.recipes.entries()].map(([id,r])=>({id,...r}));
+  const RF=['Vše','Oblíbené','Chutnalo','Nechutnalo'];
+  $('r-chips').innerHTML=RF.map(f=>`<button class="chip" aria-pressed="${f===S.rf}" data-rf="${f}">${f}</button>`).join('');
+  $('r-chips').querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{S.rf=b.dataset.rf;renderRecipes()});
+  if(S.rf==='Oblíbené')rs=rs.filter(r=>r.fav);else if(S.rf==='Chutnalo')rs=rs.filter(r=>r.rating==='up');else if(S.rf==='Nechutnalo')rs=rs.filter(r=>r.rating==='down');
+  if(q)rs=rs.filter(r=>(r.title+' '+(r.tags||[]).join(' ')+' '+(r.ingredients||[]).map(i=>i.name).join(' ')).toLowerCase().includes(q));
+  rs.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||String(a.title).localeCompare(b.title,'cs'));
+  const el=$('r-list');
+  if(!S.loaded.recipes){el.innerHTML='<p class="sub">Načítám recepty…</p>';return}
+  if(!rs.length){el.innerHTML=`<div class="empty">${q?'Nic takového tu není.':'Zatím žádné recepty. Přibudou s prvním plánem, nebo vložte vlastní níže.'}</div>`;return}
+  el.innerHTML=rs.map(r=>`<button class="rcard" data-open="${esc(r.id)}"><span class="thumb">${pic(r,r.id)}</span><span style="min-width:0"><h3>${r.fav?'★ ':''}${esc(r.title)}</h3>
+    <div class="sub num" style="margin-bottom:6px">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}${r.rating==='up'?' · chutnalo':r.rating==='down'?' · nechutnalo':''}</div>
+    <div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>`).join('');
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
+}
+$('r-q').oninput=e=>{S.q=e.target.value;renderRecipes()};
+$('r-add').onclick=async()=>{const txt=$('r-paste').value.trim();if(!txt){$('r-status').textContent='Nejdřív vložte text receptu.';return}
+  if(!sample){$('r-status').textContent='Převod přes Clauda tady není dostupný.';return}
+  $('r-add').disabled=true;$('r-status').textContent='Claude převádí recept…';
+  try{const r=await sample.json(`Převeď tento recept do přehledné české podoby. Zachovej množství. ${recipeJSONSpec()}\n\nText receptu:\n${txt.slice(0,12000)}`,{modelTier:'quick'});
+    if(!r?.title)throw {code:'invalid_json'};
+    const id='r-'+Date.now().toString(36);
+    const ok=await write(()=>db.doc('recipes/'+id).set({...cleanRecipe(r),source:$('r-src').value.trim()||'vlastní',createdAt:new Date().toISOString()}));
+    if(ok){$('r-paste').value='';$('r-src').value='';$('r-status').textContent='';toast('Recept uložen.');openRecipe(id)}
+  }catch(e){$('r-status').textContent=sampleMsg(e)}finally{$('r-add').disabled=false}};
+
+function openRecipe(id){S.openRecipe=id||null;renderSheet()}
+function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.recipes.get(id);
+  if(!r){sh.hidden=true;document.body.style.overflow='';return}
+  const src=r.source&&/^https?:\/\//.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</a>`:esc(r.source||'');
+  sh.innerHTML=`<div class="wrap stack"><div class="row" style="justify-content:space-between"><button class="btn" id="sh-x">← Zpět</button>
+      <button class="btn${r.fav?' primary':''}" id="sh-fav" aria-pressed="${!!r.fav}">${r.fav?'★ Oblíbené':'☆ Oblíbit'}</button></div>
+    <div class="hero">${pic(r,id)}</div>
+    ${assets?`<div class="row" style="justify-content:center"><label class="btn" for="sh-photo">${r.photo?'Vyměnit fotku':'Přidat vlastní fotku'}</label><input type="file" id="sh-photo" accept="image/jpeg,image/png,image/webp" hidden>${r.photo?'<button class="btn ghost" id="sh-nophoto">Zpět na ilustraci</button>':''}</div>`:''}
+    <div><h2 id="sheet-title" style="margin-top:6px">${esc(r.title)}</h2>
+      <div class="sub num">${r.time?r.time+' min celkem':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}</div></div>
+    ${r.note?`<p style="margin:0;max-width:60ch">${esc(r.note)}</p>`:''}
+    <div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <h3>Suroviny</h3><ul class="ing">${(r.ingredients||[]).map(i=>`<li><span>${esc(i.name)}</span><span class="num">${esc(i.qty)}</span></li>`).join('')}</ul>
+    <div class="row"><button class="btn" id="sh-add">Přidat suroviny na seznam</button><a class="btn" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Fotky tohoto jídla ↗</a></div>
+    ${r.sourceUrl?`<a class="panel" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:var(--ink)"><span class="eyebrow">Recept na webu</span><br><b>${esc(r.sourceLabel||r.sourceUrl.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</b> ↗</a>`:''}
+    <h3>Postup</h3><ol>${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+    <h3>Jak chutnalo?</h3><div class="row"><button class="btn rate" data-rate="up" aria-pressed="${r.rating==='up'}">Chutnalo</button><button class="btn rate" data-rate="down" aria-pressed="${r.rating==='down'}">Nechutnalo</button></div>
+    <p class="sub">Oblíbené a hodnocení se ukládají pro vás oba a Claude podle nich skládá další plány: oblíbená jídla občas zopakuje, podobná přidá a těm, co nechutnala, se vyhne.${src?' Zdroj: '+src:''}</p></div>`;
+  sh.hidden=false;document.body.style.overflow='hidden';
+  $('sh-x').onclick=()=>openRecipe(null);
+  if($('sh-photo'))$('sh-photo').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;toast('Nahrávám fotku…');
+    try{const up=await assets.upload(f);await write(()=>db.doc('recipes/'+id).update({photo:up.id}),'Fotka uložena.')}catch(err){toast(err?.code==='too_large'?'Fotka je moc velká (max 20 MB).':'Fotku se nepodařilo nahrát.')}};
+  if($('sh-nophoto'))$('sh-nophoto').onclick=()=>write(()=>db.doc('recipes/'+id).update({photo:null}));
+  $('sh-fav').onclick=()=>write(()=>db.doc('recipes/'+id).update({fav:!r.fav}));
+  sh.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>write(()=>db.doc('recipes/'+id).update({rating:r.rating===b.dataset.rate?null:b.dataset.rate})));
+  $('sh-add').onclick=async()=>{const base=Date.now();let n=0;for(const i of r.ingredients||[]){const ok=await write(()=>db.collection('items').add({name:i.name,qty:i.qty,store:'Kdekoli',cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',note:r.title,trip:1,order:base+n}));if(!ok)return;n++}toast(`Přidáno ${n} surovin na seznam.`)};
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.openRecipe)openRecipe(null)});
+
+/* ---------- profile ---------- */
+const PF=['likes','avoid','goals','budget','stores','sites','notes'];
+let profileDirty=false;
+PF.forEach(k=>$('p-'+k).addEventListener('input',()=>{profileDirty=true;$('p-status').textContent='Neuloženo'}));
+function imgSearch(t){return 'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(t)}
+function renderProfile(){const lp=S.profile?.learned;$('p-learned-box').hidden=!lp;$('p-learned').textContent=lp||'';if(profileDirty)return;const p=S.profile||{};PF.forEach(k=>{const el=$('p-'+k);if(document.activeElement!==el)el.value=p[k]||''})}
+$('pform').onsubmit=async e=>{e.preventDefault();const data={};PF.forEach(k=>data[k]=$('p-'+k).value.trim());data.updatedAt=new Date().toISOString();if(S.profile?.learned)data.learned=S.profile.learned;
+  if(await write(()=>db.doc('meta/profile').set(data),'Profil uložen.')){profileDirty=false;$('p-status').textContent=''}};
+
+/* ---------- render + data ---------- */
+function render(){
+  const p=S.plan;$('hdr').textContent=p?.weekLabel||'';
+  if(S.view==='tyden')renderWeek();
+  renderShop();renderRecipes();renderProfile();
+  if(S.openRecipe)renderSheet();
+  const rp=$('r-add').closest('.panel');rp.hidden=!sample;
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="src/data-layer.js"></script>
+</body>
+</html>
