@@ -787,7 +787,7 @@ function onList(name,store){const k=normName(name);return S.items.some(i=>!i.che
 function fmtChecked(t){if(!t)return '';const d=new Date(t);if(isNaN(d))return String(t);return d.getDate()+'. '+(d.getMonth()+1)+'. '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 S.dealRows=[];
 function dealRow(f,i,hit){const inList=onList(f.name,f.store);const reg=kcNum(f.regular);const pr=kcNum(f.price);
-  return `<div class="drow"><div class="t"><b>${esc(f.name)}</b><small>${hit&&f.match?`<span class="hit">hlídáte: ${esc(f.match)}</span>`:''}${f.until?'do '+esc(f.until):''}</small></div>
+  return `<div class="drow"><div class="t"><b>${esc(f.name)}</b><small>${hit&&f.match?`<span class="hit">hlídáte: ${esc(f.match)}</span>`:''}${f.from&&f.from===f.until?'jen '+esc(f.from):(f.from?'od '+esc(f.from)+' ':'')+(f.until?'do '+esc(f.until):'')}</small></div>
     <div class="tagp"><span class="p sale">${pr!=null?kc(pr):esc(f.price||'')}</span>${reg!=null&&reg>(pr||0)?`<s>${kc(reg)}</s>`:''}</div>
     <button class="btn ${inList?'done':''}" data-addeal="${i}" ${inList?'disabled':''}>${inList?'Na seznamu ✓':'+ Na seznam'}</button></div>`}
 function renderDeals(){
