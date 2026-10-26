@@ -60,8 +60,9 @@ textarea{min-height:76px;resize:vertical}
 /* week */
 .day{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .day.today{border-color:var(--accent)}
-.dayhead{display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;background:var(--soft)}
-.dayhead .note{font-size:13px;color:var(--muted)}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px;background:var(--soft)}
+.dayhead h3{flex:none;white-space:nowrap}
+.dayhead .note{font-size:13px;color:var(--muted);text-align:right;min-width:0}
 .meal{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:10px 14px;border-top:1px solid var(--line);align-items:start}
 .thumb{display:block;width:64px;height:64px;border-radius:12px;overflow:hidden;background:var(--soft);border:0;padding:0}
 .thumb svg,.thumb img{display:block;width:100%;height:100%;object-fit:cover}
@@ -336,9 +337,7 @@ function renderWeek(){
     <div class="row"><button class="btn ghost" data-reqcancel="${esc(rp.id)}">${rp.status==='waiting'?'Zrušit':'Zavřít'}</button></div></div>`}
   h+=`<div class="stack" style="margin-top:18px">`;
   (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
-    h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3>${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;
-    rulesFor(d.date).forEach(r=>{h+=`<span class="rulechip">${esc(short(r.text))}</span>`});
-    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
+    h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3>${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
       const sw=S.swap&&S.swap.di===di&&S.swap.slot===slot;
       const rr=has?S.recipes.get(m.recipeId):null;
       h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
@@ -799,7 +798,6 @@ function renderDeals(){
   const stores=storeList().filter(s=>s!=='Kdekoli');
   const hits={},other={};
   found.forEach(f=>{(hits[f.store]=hits[f.store]||[]).push(f)});
-  (S.deals?.items||[]).forEach(d=>{if(found.some(f=>f.store===d.store&&normName(f.name)===normName(d.name)))return;(other[d.store]=other[d.store]||[]).push(d)});
   const all=[...stores,...Object.keys(hits).filter(s=>!stores.includes(s))];
   $('sl-badge').textContent=found.length?`(${found.length})`:'';
   let h=`<p class="sub" style="margin:0">Hlídáme vybrané potraviny v obchodech z profilu. Letáky se kontrolují v pondělí a ve čtvrtek ráno.${w.checkedAt?` Naposledy: ${esc(fmtChecked(w.checkedAt))}.`:''}</p>`;
@@ -808,10 +806,9 @@ function renderDeals(){
   if(w.note)h+=`<p class="sub" style="margin:0">${esc(w.note)}</p>`;
   const wl=`<div class="pg" id="sl-list"><span class="eyebrow">Co hlídáme (${list.length})</span><div class="pcard">${list.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-wname="${i}" aria-label="Hlídaná potravina"><button class="x" data-wrm="${i}" aria-label="Přestat hlídat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co kupujete pravidelně.</small></span></div>'}
     <form class="addrow" id="sl-add" style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="sl-new" placeholder="Např. máslo, kuřecí stehna, káva" aria-label="Přidat potravinu"><button type="submit" aria-label="Přidat">+</button></form></div></div>`;
-  for(const s of all){const hs=hits[s]||[],os=other[s]||[];
+  for(const s of all){const hs=hits[s]||[];
     h+=`<div class="pg"><span class="eyebrow">${esc(s)}${hs.length?` · ${hs.length} v akci`:''}</span><div class="pcard">`;
     h+=hs.length?hs.map(f=>{rows.push(f);return dealRow(f,rows.length-1,true)}).join(''):`<div class="prow"><span class="t"><small>${found.length||w.checkedAt?'Nic z hlídaných potravin teď v akci.':'Zatím nezkontrolováno.'}</small></span></div>`;
-    if(os.length)h+=`<details><summary>Další akce (${os.length})</summary>${os.map(f=>{rows.push(f);return dealRow(f,rows.length-1,false)}).join('')}</details>`;
     h+=`</div></div>`}
   $('sl-main').innerHTML=h+wl}
 async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||MEM.docs.get('watch')||{}),list}),msg)}
