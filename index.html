@@ -804,18 +804,19 @@ function renderDeals(){
   $('sl-badge').textContent=found.length?`(${found.length})`:'';
   let h=`<p class="sub" style="margin:0">Hlídáme vybrané potraviny v obchodech z profilu. Letáky se kontrolují v pondělí a ve čtvrtek ráno.${w.checkedAt?` Naposledy: ${esc(fmtChecked(w.checkedAt))}.`:''}</p>`;
   h+=waiting?`<div class="banner" style="margin:0"><b>Kontrola běží</b><span class="sub" style="color:var(--ink)">Claude prochází letáky, výsledky se tu objeví do 2 hodin.</span></div>`
-    :`<button class="btn" id="sl-check" style="align-self:flex-start;min-height:40px">Zkontrolovat teď</button>`;
+    :`<div class="row"><button class="btn" id="sl-check" style="min-height:40px">Zkontrolovat teď</button><button class="btn ghost" id="sl-goto" style="min-height:40px">Upravit, co hlídáme (${list.length})</button></div>`;
   if(w.note)h+=`<p class="sub" style="margin:0">${esc(w.note)}</p>`;
-  h+=`<div class="pg"><span class="eyebrow">Co hlídáme (${list.length})</span><div class="pcard">${list.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-wname="${i}" aria-label="Hlídaná potravina"><button class="x" data-wrm="${i}" aria-label="Přestat hlídat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co kupujete pravidelně.</small></span></div>'}
+  const wl=`<div class="pg" id="sl-list"><span class="eyebrow">Co hlídáme (${list.length})</span><div class="pcard">${list.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-wname="${i}" aria-label="Hlídaná potravina"><button class="x" data-wrm="${i}" aria-label="Přestat hlídat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co kupujete pravidelně.</small></span></div>'}
     <form class="addrow" id="sl-add" style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="sl-new" placeholder="Např. máslo, kuřecí stehna, káva" aria-label="Přidat potravinu"><button type="submit" aria-label="Přidat">+</button></form></div></div>`;
   for(const s of all){const hs=hits[s]||[],os=other[s]||[];
     h+=`<div class="pg"><span class="eyebrow">${esc(s)}${hs.length?` · ${hs.length} v akci`:''}</span><div class="pcard">`;
     h+=hs.length?hs.map(f=>{rows.push(f);return dealRow(f,rows.length-1,true)}).join(''):`<div class="prow"><span class="t"><small>${found.length||w.checkedAt?'Nic z hlídaných potravin teď v akci.':'Zatím nezkontrolováno.'}</small></span></div>`;
     if(os.length)h+=`<details><summary>Další akce (${os.length})</summary>${os.map(f=>{rows.push(f);return dealRow(f,rows.length-1,false)}).join('')}</details>`;
     h+=`</div></div>`}
-  $('sl-main').innerHTML=h}
+  $('sl-main').innerHTML=h+wl}
 async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||MEM.docs.get('watch')||{}),list}),msg)}
 $('sl-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;
+  if(b.id==='sl-goto'){$('sl-list').scrollIntoView({behavior:'smooth',block:'start'});return}
   if(b.id==='sl-check'){const id='req-'+Date.now().toString(36);if(await write(()=>db.doc('meta/'+id).set({type:'deals',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi.'))renderDeals();return}
   if(b.dataset.wrm!=null){const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
   if(b.dataset.addeal!=null){const f=S.dealRows[+b.dataset.addeal];if(!f)return;const pr=kcNum(f.price),reg=kcNum(f.regular);
@@ -836,6 +837,6 @@ function render(){
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="src/data-layer.js?v=10"></script>
+<script src="src/data-layer.js?v=11"></script>
 </body>
 </html>
