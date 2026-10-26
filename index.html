@@ -128,7 +128,7 @@ a.btn{text-decoration:none;color:var(--ink);display:inline-block}
 .rate[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 /* nav */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--surface);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(4,1fr);
+  display:grid;grid-template-columns:repeat(5,1fr);
   padding:6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px))}
 nav.tabs button{background:none;border:0;padding:8px 4px;border-radius:10px;font-weight:700;font-size:13px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
 nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
@@ -195,6 +195,17 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
 .srow .x{width:36px;height:44px;border:0;background:none;color:var(--muted);font-size:20px}
 .check{display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:15px}
 .check input{width:22px;height:22px;accent-color:var(--accent)}
+/* deals */
+.drow{display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:10px 16px;border-top:1px solid var(--line);align-items:start}
+.pcard>.drow:first-child{border-top:0}
+.drow .t b{font-weight:600}
+.drow .t small{display:block;font-size:13px;color:var(--muted)}
+.drow .hit{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--tag);color:var(--tag-ink);border-radius:4px;padding:1px 6px;margin-right:6px}
+.drow .btn{grid-column:1/-1;justify-self:start;min-height:36px}
+.drow .btn.done{background:var(--soft);border-color:var(--soft);color:var(--accent)}
+.pcard details{border-top:1px solid var(--line)}
+.pcard details summary{padding:12px 16px;color:var(--accent);font-size:15px}
+nav.tabs button{font-size:12px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -237,6 +248,11 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
       </div>
     </section>
 
+    <section id="v-slevy" hidden>
+      <h2>Slevy</h2>
+      <div id="sl-main" class="stack" style="gap:18px;margin-top:8px"></div>
+    </section>
+
     <section id="v-recepty" hidden>
       <h2>Recepty</h2>
       <p class="sub">Jídla z plánů a vaše vlastní. Klepněte pro postup.</p>
@@ -272,12 +288,13 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
 <nav class="tabs" aria-label="Sekce">
   <button data-v="tyden"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Týden</button>
   <button data-v="nakup"><svg viewBox="0 0 24 24"><path d="M4 5h2l2 11h10l2-8H7"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="16.5" cy="19.5" r="1.3"/></svg><span>Nákup <span class="badge" id="badge"></span></span></button>
+  <button data-v="slevy"><svg viewBox="0 0 24 24"><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8-9 9z"/><circle cx="8.5" cy="8.5" r="1.4"/></svg><span>Slevy <span class="badge" id="sl-badge"></span></span></button>
   <button data-v="recepty"><svg viewBox="0 0 24 24"><path d="M6 3.5h10a2 2 0 0 1 2 2v15H8a2 2 0 0 1-2-2z"/><path d="M6 18.5a2 2 0 0 1 2-2h10M10 8h5M10 11h4"/></svg>Recepty</button>
   <button data-v="profil"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.6 3.8-5.5 7-5.5s6 1.9 7 5.5"/></svg>Profil</button>
 </nav>
 
 <script>
-const VIEWS=['tyden','nakup','recepty','profil'];
+const VIEWS=['tyden','nakup','slevy','recepty','profil'];
 const CATS=['Maso a ryby','Zelenina a ovoce','Mléčné a vejce','Spíž','Pečivo','Ostatní'];
 let STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
 const SLOTN={lunch:'Oběd',dinner:'Večeře',dessert:'Moučník'};
@@ -757,12 +774,63 @@ $('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const f
   const ok=await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'replan',fromDate:from,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi. Změny uvidíte na kartě Týden.');
   if(ok){$('p-replan').hidden=true;show('tyden')}};
 
+/* ---------- deals watch: docs 'watch' = {list:[{id,name}], found:[{store,name,price,regular,until,match}], checkedAt, note} ---------- */
+const normName=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const kcNum=v=>{if(v==null||v==='')return null;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.').replace(/[^\d.]/g,''));return isNaN(n)?null:n};
+function guessCat(n){n=normName(n);
+  if(/maso|kur|vepr|hov|mlet|ryb|losos|tunak|plec|steh|prsa|slanin|prosciut|salsic|guanc|krut/.test(n))return 'Maso a ryby';
+  if(/syr|mlek|jogurt|tvaroh|vejc|masl|smetan|mozzar|burrat|parmaz|eidam|gran/.test(n))return 'Mléčné a vejce';
+  if(/chleb|rohl|bagel|peciv|kvask|toast/.test(n))return 'Pečivo';
+  if(/jabl|hrus|banan|citron|limet|pomer|avokad|rajc|paprik|okurk|mrkev|brambor|cibul|cesnek|dyn|zeli|salat|spenat|brokol|kvetak|zelenin|ovoc|hrozn|mandarin/.test(n))return 'Zelenina a ovoce';
+  if(/testovin|ryze|mouk|cukr|olej|cocka|fazol|konzerv|kava|caj|vlocky|bulgur|kuskus|orech/.test(n))return 'Spíž';
+  return 'Ostatní'}
+function onList(name,store){const k=normName(name);return S.items.some(i=>!i.checked&&normName(i.name)===k&&(i.store===store||!store))}
+function fmtChecked(t){if(!t)return '';const d=new Date(t);if(isNaN(d))return String(t);return d.getDate()+'. '+(d.getMonth()+1)+'. '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+S.dealRows=[];
+function dealRow(f,i,hit){const inList=onList(f.name,f.store);const reg=kcNum(f.regular);const pr=kcNum(f.price);
+  return `<div class="drow"><div class="t"><b>${esc(f.name)}</b><small>${hit&&f.match?`<span class="hit">hlídáte: ${esc(f.match)}</span>`:''}${f.until?'do '+esc(f.until):''}</small></div>
+    <div class="tagp"><span class="p sale">${pr!=null?kc(pr):esc(f.price||'')}</span>${reg!=null&&reg>(pr||0)?`<s>${kc(reg)}</s>`:''}</div>
+    <button class="btn ${inList?'done':''}" data-addeal="${i}" ${inList?'disabled':''}>${inList?'Na seznamu ✓':'+ Na seznam'}</button></div>`}
+function renderDeals(){
+  const ae=document.activeElement;if(ae&&$('sl-main').contains(ae)&&ae.matches('input'))return;
+  const w=S.watch||{};const list=Array.isArray(w.list)?w.list:[];const found=Array.isArray(w.found)?w.found:[];
+  const waiting=(S.requests||[]).some(r=>r.type==='deals'&&r.status==='waiting');
+  const rows=[];S.dealRows=rows;
+  const stores=storeList().filter(s=>s!=='Kdekoli');
+  const hits={},other={};
+  found.forEach(f=>{(hits[f.store]=hits[f.store]||[]).push(f)});
+  (S.deals?.items||[]).forEach(d=>{if(found.some(f=>f.store===d.store&&normName(f.name)===normName(d.name)))return;(other[d.store]=other[d.store]||[]).push(d)});
+  const all=[...stores,...Object.keys(hits).filter(s=>!stores.includes(s))];
+  $('sl-badge').textContent=found.length?`(${found.length})`:'';
+  let h=`<p class="sub" style="margin:0">Hlídáme vybrané potraviny v obchodech z profilu. Letáky se kontrolují v pondělí a ve čtvrtek ráno.${w.checkedAt?` Naposledy: ${esc(fmtChecked(w.checkedAt))}.`:''}</p>`;
+  h+=waiting?`<div class="banner" style="margin:0"><b>Kontrola běží</b><span class="sub" style="color:var(--ink)">Claude prochází letáky, výsledky se tu objeví do 2 hodin.</span></div>`
+    :`<button class="btn" id="sl-check" style="align-self:flex-start;min-height:40px">Zkontrolovat teď</button>`;
+  if(w.note)h+=`<p class="sub" style="margin:0">${esc(w.note)}</p>`;
+  h+=`<div class="pg"><span class="eyebrow">Co hlídáme (${list.length})</span><div class="pcard">${list.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-wname="${i}" aria-label="Hlídaná potravina"><button class="x" data-wrm="${i}" aria-label="Přestat hlídat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co kupujete pravidelně.</small></span></div>'}
+    <form class="addrow" id="sl-add" style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="sl-new" placeholder="Např. máslo, kuřecí stehna, káva" aria-label="Přidat potravinu"><button type="submit" aria-label="Přidat">+</button></form></div></div>`;
+  for(const s of all){const hs=hits[s]||[],os=other[s]||[];
+    h+=`<div class="pg"><span class="eyebrow">${esc(s)}${hs.length?` · ${hs.length} v akci`:''}</span><div class="pcard">`;
+    h+=hs.length?hs.map(f=>{rows.push(f);return dealRow(f,rows.length-1,true)}).join(''):`<div class="prow"><span class="t"><small>${found.length||w.checkedAt?'Nic z hlídaných potravin teď v akci.':'Zatím nezkontrolováno.'}</small></span></div>`;
+    if(os.length)h+=`<details><summary>Další akce (${os.length})</summary>${os.map(f=>{rows.push(f);return dealRow(f,rows.length-1,false)}).join('')}</details>`;
+    h+=`</div></div>`}
+  $('sl-main').innerHTML=h}
+async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||{}),list}),msg)}
+$('sl-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;
+  if(b.id==='sl-check'){const id='req-'+Date.now().toString(36);if(await write(()=>db.doc('meta/'+id).set({type:'deals',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi.'))renderDeals();return}
+  if(b.dataset.wrm!=null){const l=[...(S.watch?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
+  if(b.dataset.addeal!=null){const f=S.dealRows[+b.dataset.addeal];if(!f)return;const pr=kcNum(f.price),reg=kcNum(f.regular);
+    await write(()=>db.collection('items').add({name:f.name,qty:'',store:f.store||'Kdekoli',cat:guessCat(f.name),price:pr,regular:reg,sale:true,checked:false,source:'manual',note:f.until?'Akce do '+f.until:'Akce',trip:1,order:Date.now()}),'Přidáno na seznam.');renderDeals()}});
+$('sl-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('sl-new').value.trim();if(!v)return;const l=[...(S.watch?.list||[])];
+  if(l.some(x=>normName(x.name)===normName(v))){toast('Už hlídáme.');return}l.push({id:uid(),name:v});if(await saveWatch(l,'Přidáno – zkontroluje se při další kontrole.')){renderDeals();$('sl-new')?.focus()}});
+$('sl-main').addEventListener('change',e=>{const t=e.target;if(t.dataset.wname==null)return;const l=(S.watch?.list||[]).map(x=>({...x}));const i=+t.dataset.wname;const v=t.value.trim();
+  if(!v){t.value=l[i].name;return}l[i].name=v;saveWatch(l,'Uloženo.')});
+
 /* ---------- render + data ---------- */
 function render(){
   const p=S.plan;$('hdr').textContent=p?.weekLabel||'';
   const ns=storeList();if(ns.join()!==STORES.join()){const cur=$('add-store').value;STORES=ns;$('add-store').innerHTML=STORES.map(s=>`<option ${s===(STORES.includes(cur)?cur:'Kdekoli')?'selected':''}>${esc(s)}</option>`).join('')}
   if(S.view==='tyden')renderWeek();
-  renderShop();renderRecipes();renderProfile();
+  renderShop();renderRecipes();renderProfile();renderDeals();
   if(S.openRecipe)renderSheet();
   const rp=$('r-add').closest('.panel');rp.hidden=!sample;
 }
