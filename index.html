@@ -814,7 +814,7 @@ function renderDeals(){
     if(os.length)h+=`<details><summary>Další akce (${os.length})</summary>${os.map(f=>{rows.push(f);return dealRow(f,rows.length-1,false)}).join('')}</details>`;
     h+=`</div></div>`}
   $('sl-main').innerHTML=h}
-async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||{}),list}),msg)}
+async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||MEM.docs.get('watch')||{}),list}),msg)}
 $('sl-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;
   if(b.id==='sl-check'){const id='req-'+Date.now().toString(36);if(await write(()=>db.doc('meta/'+id).set({type:'deals',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi.'))renderDeals();return}
   if(b.dataset.wrm!=null){const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
