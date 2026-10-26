@@ -337,7 +337,7 @@ function renderWeek(){
     <div class="row"><button class="btn ghost" data-reqcancel="${esc(rp.id)}">${rp.status==='waiting'?'Zrušit':'Zavřít'}</button></div></div>`}
   h+=`<div class="stack" style="margin-top:18px">`;
   (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
-    h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3>${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
+    h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3></div>`;    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
       const sw=S.swap&&S.swap.di===di&&S.swap.slot===slot;
       const rr=has?S.recipes.get(m.recipeId):null;
       h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
