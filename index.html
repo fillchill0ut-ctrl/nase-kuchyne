@@ -82,6 +82,14 @@ textarea{min-height:76px;resize:vertical}
 .opt .btn{justify-self:start}
 a.btn{text-decoration:none;color:var(--ink);display:inline-block}
 .shop{border-left:3px solid var(--tag);padding:2px 0 2px 12px}
+.rulechip{display:block;font-size:13px;color:var(--ink);background:#fff6cf;border-top:1px solid var(--line);padding:6px 14px}
+.rule{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.rule.off{opacity:.6}
+.daypick{display:flex;gap:4px;flex-wrap:wrap}
+.daypick button{min-width:40px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 8px;font-weight:700;font-size:13px}
+.daypick button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.rule input[type=date]{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:inherit}
+.banner{background:#fff6cf;border:1px solid #f0d97a;border-radius:var(--r);padding:12px 14px;margin-top:14px;display:flex;flex-direction:column;gap:8px}
 /* shopping */
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:600}
@@ -201,6 +209,12 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
         <label class="stack" style="gap:4px"><span class="eyebrow">Co máme rádi</span><textarea id="p-likes"></textarea></label>
         <label class="stack" style="gap:4px"><span class="eyebrow">Čemu se vyhnout</span><textarea id="p-avoid"></textarea></label>
         <label class="stack" style="gap:4px"><span class="eyebrow">Typy jídel a cíle</span><textarea id="p-goals"></textarea></label>
+        <div class="stack" style="gap:8px">
+          <span class="eyebrow">Dočasná pravidla</span>
+          <p class="sub" style="margin:0">Platí pro vybrané dny, dokud je nevypnete nebo nesmažete. Mají přednost před ostatními preferencemi.</p>
+          <div class="stack" id="p-rules" style="gap:10px"></div>
+          <div class="row"><button class="btn" type="button" id="p-addrule">+ Přidat pravidlo</button></div>
+        </div>
         <label class="stack" style="gap:4px"><span class="eyebrow">Rozpočet a čas</span><textarea id="p-budget"></textarea></label>
         <label class="stack" style="gap:4px"><span class="eyebrow">Obchody</span><textarea id="p-stores"></textarea></label>
         <label class="stack" style="gap:4px"><span class="eyebrow">Weby s recepty</span><textarea id="p-sites"></textarea></label>
@@ -208,6 +222,11 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
         <label class="stack" style="gap:4px"><span class="eyebrow">Vzkaz pro příští plán</span><textarea id="p-notes" placeholder="Např. příští týden máme návštěvu v sobotu"></textarea></label>
         <div class="row"><button class="btn primary" type="submit">Uložit profil</button><span class="sub" id="p-status"></span></div>
       </form>
+      <div class="banner" id="p-replan" hidden>
+        <b>Upravit podle toho i zbytek tohoto týdne?</b>
+        <span class="sub" style="color:var(--ink)">Změny v profilu se jinak projeví až v novém plánu v neděli. Claude upraví zbývající dny a nekoupené položky na seznamu. Co už máte koupené, zůstane a využije se.</span>
+        <div class="row"><button class="btn primary" type="button" id="p-replan-go">Přeplánovat zbytek týdne</button><button class="btn ghost" type="button" id="p-replan-no">Ne, až od neděle</button></div>
+      </div>
       <div class="panel row" style="margin-top:20px;justify-content:space-between"><span class="sub">Přihlášen: <b id="who"></b></span><button class="btn ghost" id="logout" type="button">Odhlásit</button></div>
     </section>
   </main>
@@ -261,9 +280,13 @@ function renderWeek(){
       <div class="stat"><b class="num">${open.length}</b><span>položek zbývá koupit</span></div></div>`;
   if(p.shops?.length){h+=`<div class="stack" style="margin-top:16px"><p class="eyebrow" style="margin:0">Kdy nakoupit</p>`;
     p.shops.forEach(s=>{h+=`<div class="shop"><h3>${esc(s.title)} · ${esc(s.when)}</h3><div class="sub">${esc(s.stores||'')}</div>${s.note?`<div class="mnote">${esc(s.note)}</div>`:''}</div>`});h+='</div>'}
+  const rp=(S.requests||[]).find(r=>r.type==='replan');
+  if(rp){h+=`<div class="banner">${rp.status==='done'?`<b>Zbytek týdne je upravený podle nových pravidel</b>${rp.message?`<span>${esc(rp.message)}</span>`:''}`:rp.status==='error'?`<b>Přeplánování se nepovedlo</b><span>${esc(rp.message||'')}</span>`:`<b>Čeká na přeplánování zbytku týdne</b><span class="sub" style="color:var(--ink)">Claude upraví zbývající dny a nákupní seznam podle nových pravidel, obvykle do 2 hodin.</span>`}
+    <div class="row"><button class="btn ghost" data-reqcancel="${esc(rp.id)}">${rp.status==='waiting'?'Zrušit':'Zavřít'}</button></div></div>`}
   h+=`<div class="stack" style="margin-top:18px">`;
   (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
     h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3>${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;
+    rulesFor(d.date).forEach(r=>{h+=`<span class="rulechip">${esc(short(r.text))}</span>`});
     ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
       const sw=S.swap&&S.swap.di===di&&S.swap.slot===slot;
       const rr=has?S.recipes.get(m.recipeId):null;
@@ -529,9 +552,39 @@ const PF=['likes','avoid','goals','budget','stores','sites','notes'];
 let profileDirty=false;
 PF.forEach(k=>$('p-'+k).addEventListener('input',()=>{profileDirty=true;$('p-status').textContent='Neuloženo'}));
 function imgSearch(t){return 'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(t)}
-function renderProfile(){const lp=S.profile?.learned;$('p-learned-box').hidden=!lp;$('p-learned').textContent=lp||'';if(profileDirty)return;const p=S.profile||{};PF.forEach(k=>{const el=$('p-'+k);if(document.activeElement!==el)el.value=p[k]||''})}
-$('pform').onsubmit=async e=>{e.preventDefault();const data={};PF.forEach(k=>data[k]=$('p-'+k).value.trim());data.updatedAt=new Date().toISOString();if(S.profile?.learned)data.learned=S.profile.learned;
-  if(await write(()=>db.doc('meta/profile').set(data),'Profil uložen.')){profileDirty=false;$('p-status').textContent=''}};
+/* temporary rules: [{id,text,days:[1..7 Mon..Sun],until:'YYYY-MM-DD'|'',active}] */
+const DSHORT=['Po','Út','St','Čt','Pá','So','Ne'];
+let RULES=null;
+function isoDow(iso){const [y,m,d]=iso.split('-').map(Number);return ((new Date(y,m-1,d).getDay()+6)%7)+1}
+function rulesFor(iso){return (S.profile?.rules||[]).filter(r=>r.active!==false&&(r.text||'').trim()&&(!r.until||r.until>=iso)&&(!(r.days||[]).length||r.days.includes(isoDow(iso))))}
+function short(t){t=String(t||'').trim();const cut=t.split(/[.:;]/)[0];return cut.length>70?cut.slice(0,68)+'…':cut}
+function renderRules(){const el=$('p-rules');if(!RULES)RULES=JSON.parse(JSON.stringify(S.profile?.rules||[]));
+  if(!RULES.length){el.innerHTML='<div class="empty" style="padding:14px">Žádná dočasná pravidla. Třeba: „V úterý a ve čtvrtek přijedeme pozdě, večeře do 20 minut.“</div>';return}
+  el.innerHTML=RULES.map((r,i)=>`<div class="rule${r.active===false?' off':''}">
+    <textarea data-rt="${i}" aria-label="Text pravidla" placeholder="Co má platit">${esc(r.text||'')}</textarea>
+    <div class="daypick" role="group" aria-label="Dny">${DSHORT.map((n,j)=>`<button type="button" data-rd="${i}|${j+1}" aria-pressed="${(r.days||[]).includes(j+1)}">${n}</button>`).join('')}</div>
+    <span class="sub" style="margin:-2px 0 0">${(r.days||[]).length?'Platí jen ve vybrané dny.':'Bez vybraných dnů platí každý den.'}</span>
+    <div class="row"><label class="row sub" style="gap:6px">Platí do <input type="date" data-ru="${i}" value="${esc(r.until||'')}"></label>
+      <label class="row sub" style="gap:6px"><input type="checkbox" data-ra="${i}" ${r.active!==false?'checked':''}> Zapnuto</label>
+      <button type="button" class="btn ghost" data-rx="${i}" style="margin-left:auto;color:var(--bad)">Smazat</button></div></div>`).join('');
+  const dirty=()=>{profileDirty=true;$('p-status').textContent='Neuloženo'};
+  el.querySelectorAll('[data-rt]').forEach(t=>t.oninput=()=>{RULES[+t.dataset.rt].text=t.value;dirty()});
+  el.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>{const [i,d]=b.dataset.rd.split('|').map(Number);const ds=new Set(RULES[i].days||[]);ds.has(d)?ds.delete(d):ds.add(d);RULES[i].days=[...ds].sort();dirty();renderRules()});
+  el.querySelectorAll('[data-ru]').forEach(t=>t.onchange=()=>{RULES[+t.dataset.ru].until=t.value;dirty()});
+  el.querySelectorAll('[data-ra]').forEach(t=>t.onchange=()=>{RULES[+t.dataset.ra].active=t.checked;dirty();renderRules()});
+  el.querySelectorAll('[data-rx]').forEach(b=>b.onclick=()=>{RULES.splice(+b.dataset.rx,1);dirty();renderRules()});
+}
+$('p-addrule').onclick=()=>{if(!RULES)RULES=[];RULES.push({id:'rule-'+Date.now().toString(36),text:'',days:[],until:'',active:true});profileDirty=true;$('p-status').textContent='Neuloženo';renderRules();const ts=$('p-rules').querySelectorAll('textarea');ts[ts.length-1]?.focus()};
+function renderProfile(){const lp=S.profile?.learned;$('p-learned-box').hidden=!lp;$('p-learned').textContent=lp||'';if(profileDirty)return;RULES=null;renderRules();const p=S.profile||{};PF.forEach(k=>{const el=$('p-'+k);if(document.activeElement!==el)el.value=p[k]||''})}
+$('pform').onsubmit=async e=>{e.preventDefault();const data={...(S.profile||{})};PF.forEach(k=>data[k]=$('p-'+k).value.trim());
+  data.rules=(RULES||[]).filter(r=>(r.text||'').trim()).map(r=>({...r,text:r.text.trim()}));data.updatedAt=new Date().toISOString();
+  if(await write(()=>db.doc('meta/profile').set(data),'Profil uložen.')){profileDirty=false;$('p-status').textContent='';RULES=null;renderRules();
+    const p=S.plan;const t=todayISO();if(p?.days?.some(d=>d.date>t))$('p-replan').hidden=false}};
+$('p-replan-no').onclick=()=>{$('p-replan').hidden=true};
+$('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const from=d.getHours()<14?t:(()=>{d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
+  const old=(S.requests||[]).filter(r=>r.type==='replan');for(const r of old)await write(()=>db.doc('meta/'+r.id).delete());
+  const ok=await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'replan',fromDate:from,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi. Změny uvidíte na kartě Týden.');
+  if(ok){$('p-replan').hidden=true;show('tyden')}};
 
 /* ---------- render + data ---------- */
 function render(){

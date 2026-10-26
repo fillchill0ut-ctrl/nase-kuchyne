@@ -1,6 +1,6 @@
 // Offline: the app shell is cached so the shopping list opens even without signal.
 // Data itself is cached by the app in localStorage.
-const CACHE = 'nk-shell-v4';
+const CACHE = 'nk-shell-v5';
 const SHELL = [
   './', './index.html', './src/data-layer.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
