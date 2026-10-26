@@ -716,7 +716,7 @@ function renderPS(){const el=$('psheet');const o=S.ps;
       ?`<div class="stack" style="gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:#f7f9f6"><label class="stack" style="gap:4px"><span class="sub">Název</span><input type="text" id="pse-name" value="${esc(s.name)}"></label><label class="stack" style="gap:4px"><span class="sub">Adresa</span><input type="text" id="pse-url" value="${esc(s.url||'')}" placeholder="nepovinné"></label><div class="row"><button class="btn primary" data-sitesave="${i}">Uložit</button><button class="btn" data-siterm="${i}" style="color:#a1331a">Smazat</button><button class="btn ghost" data-siteedit="-1">Zrušit</button></div></div>`
       :`<div class="srow"><button class="prow" style="border:0;padding:0" data-siteedit="${i}"><span class="t"><b>${esc(s.name)}</b>${s.url?`<small>${esc(s.url)}</small>`:''}</span></button><button class="x" data-siterm="${i}" aria-label="Smazat ${esc(s.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím žádné.</small></span></div>'}</div></div></div>`}
   el.innerHTML=h}
-$('psheet').addEventListener('click',async e=>{const b=e.target.closest('button');const o=S.ps;if(!b||!o||b.type==='submit')return;const d=b.dataset;const p=prof();
+$('psheet').addEventListener('click',async e=>{const b=e.target.closest('button');const o=S.ps;if(!b||!o||(b.type==='submit'&&b.form))return;const d=b.dataset;const p=prof();
   if(d.ps==='close')return closePS();
   if(o.type==='member'){syncPS();const m=o.d;
     if(d.kind){m.kind=d.kind;return renderPS()}
