@@ -145,6 +145,56 @@ table.deals td.r{text-align:right;white-space:nowrap}
 .login form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px}
 .login img{width:88px;height:88px;border-radius:22px}
 input[type=email],input[type=password]{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+/* profile */
+.pg{display:flex;flex-direction:column;gap:6px}
+.pg>.eyebrow{margin:0 4px}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.pcard.pad{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;min-height:48px;background:none;border:0;border-top:1px solid var(--line);text-align:left;color:var(--ink)}
+.prow:first-child{border-top:0}
+.prow .t{flex:1;min-width:0}
+.prow .t b{display:block;font-weight:600}
+.prow .t small{display:block;font-size:14px;color:var(--muted)}
+.prow .chev{flex:none;width:18px;height:18px;stroke:#9aa59c;fill:none;stroke-width:2}
+.prow.act{color:var(--accent);font-weight:700}
+.av{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.av.kid{background:var(--tag);color:var(--tag-ink)}
+.dtag{flex:none;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;background:#eef1ed;color:#3d463f;margin-top:2px}
+.dtag.on{background:var(--tag);color:var(--tag-ink)}
+.prow.req{align-items:flex-start}
+.tl{display:flex;flex-wrap:wrap;gap:8px}
+.tc{display:inline-flex;align-items:center;gap:6px;background:var(--soft);color:#26402f;border:0;padding:6px 12px;border-radius:999px;font-size:14px}
+.tc.no{background:#fbe9e2;color:#8a2f16}
+.tc.add{background:transparent;border:1px dashed #9aa59c;color:var(--accent);font-weight:600;padding:5px 12px}
+.tc.store{background:var(--accent);color:#fff;font-weight:600;padding:8px 14px}
+.tc.store.sometimes{background:var(--surface);color:var(--ink);border:1px solid #9aa59c;font-weight:400;padding:7px 14px}
+.tc.store.no{background:var(--surface);color:var(--muted);border:1px solid var(--line);font-weight:400;padding:7px 14px;text-decoration:line-through}
+.tc .x{background:none;border:0;padding:0 0 0 2px;font-size:16px;line-height:1;color:inherit}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pgrid label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.pgrid input{font-weight:600;color:var(--ink)}
+.seg{display:inline-flex;background:#eef1ed;border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:8px;min-height:34px;padding:0 10px;font-weight:600;font-size:13px;color:#3d463f}
+.seg button[aria-pressed=true]{background:var(--accent);color:#fff}
+.seg.wide{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+.seg.wide button{min-height:40px;font-size:15px}
+.seg.wide button[aria-pressed=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.days7{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.days7 button{min-height:44px;border-radius:50%;aspect-ratio:1;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px;padding:0}
+.days7 button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.pshead{display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto}
+.pshead .link{min-height:44px;padding:0 6px;font-size:16px}
+.psbody{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.danger{background:none;border:0;color:#a1331a;font-weight:700;min-height:44px}
+.addrow{display:flex;gap:8px}
+.addrow input{flex:1}
+.addrow button{flex:none;width:44px;min-height:44px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:22px}
+.srow{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow input{flex:1;min-width:0;border:0;padding:8px 0;background:transparent;font-weight:600}
+.srow .x{width:36px;height:44px;border:0;background:none;color:var(--muted);font-size:20px}
+.check{display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:15px}
+.check input{width:22px;height:22px;accent-color:var(--accent)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -204,35 +254,19 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
 
     <section id="v-profil" hidden>
       <h2>Profil</h2>
-      <p class="sub">Podle těchto informací Claude skládá plány a navrhuje jídla. Pište volně, celými větami, a kdykoli je změňte.</p>
-      <form class="stack" id="pform" style="margin-top:12px">
-        <label class="stack" style="gap:4px"><span class="eyebrow">Naše domácnost</span><span class="sub" style="margin:0">Kdo jí, porce, obědy, školka, cokoli, co platí pořád.</span><textarea id="p-household" style="min-height:120px"></textarea></label>
-        <div class="stack" style="gap:6px">
-          <span class="eyebrow">Týdenní režim</span>
-          <span class="sub" style="margin:0">Co platí v jednotlivé dny, třeba „přijedeme pozdě, rychlá večeře“. Prázdné = běžný den.</span>
-          <div class="stack" id="p-week" style="gap:6px"></div>
-        </div>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Co máme rádi</span><textarea id="p-likes"></textarea></label>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Čemu se vyhnout</span><textarea id="p-avoid"></textarea></label>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Typy jídel a zásady</span><textarea id="p-goals"></textarea></label>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Rozpočet a čas</span><textarea id="p-budget"></textarea></label>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Obchody</span><textarea id="p-stores"></textarea></label>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Weby s recepty</span><textarea id="p-sites"></textarea></label>
-        <div class="panel stack" id="p-learned-box" hidden style="gap:6px"><span class="eyebrow">Co se Claude naučil z vašich hodnocení</span><p id="p-learned" style="margin:0;max-width:60ch"></p></div>
-        <label class="stack" style="gap:4px"><span class="eyebrow">Vzkaz pro příští plán</span><textarea id="p-notes" placeholder="Např. příští týden máme návštěvu v sobotu"></textarea></label>
-        <div class="row"><button class="btn primary" type="submit">Uložit profil</button><span class="sub" id="p-status"></span></div>
-      </form>
       <div class="banner" id="p-replan" hidden>
         <b>Upravit podle toho i zbytek tohoto týdne?</b>
         <span class="sub" style="color:var(--ink)">Změny v profilu se jinak projeví až v novém plánu v neděli. Claude upraví zbývající dny a nekoupené položky na seznamu. Co už máte koupené, zůstane a využije se.</span>
         <div class="row"><button class="btn primary" type="button" id="p-replan-go">Přeplánovat zbytek týdne</button><button class="btn ghost" type="button" id="p-replan-no">Ne, až od neděle</button></div>
       </div>
+      <div id="p-main" class="stack" style="gap:18px;margin-top:12px"></div>
       <div class="panel row" style="margin-top:20px;justify-content:space-between"><span class="sub">Přihlášen: <b id="who"></b></span><button class="btn ghost" id="logout" type="button">Odhlásit</button></div>
     </section>
   </main>
 </div>
 
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+<div class="sheet" id="psheet" hidden role="dialog" aria-modal="true" aria-labelledby="ps-title"></div>
 <div class="toast" id="toast" hidden></div>
 
 <nav class="tabs" aria-label="Sekce">
@@ -245,7 +279,7 @@ input[type=email],input[type=password]{width:100%;background:var(--surface);bord
 <script>
 const VIEWS=['tyden','nakup','recepty','profil'];
 const CATS=['Maso a ryby','Zelenina a ovoce','Mléčné a vejce','Spíž','Pečivo','Ostatní'];
-const STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
+let STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
 const SLOTN={lunch:'Oběd',dinner:'Večeře',dessert:'Moučník'};
 const DAYN=['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
 const S={items:[],recipes:new Map(),plan:null,profile:null,deals:null,loaded:{items:false,plan:false,recipes:false},
@@ -378,10 +412,7 @@ async function askSwap(mode){
   const L=dateLabel(d.date);const weekend=[0,6].includes(new Date(d.date+'T12:00').getDay())||/svátek/i.test(d.note||'');
   const ctx=`Jídlo je ${SLOTN[sw.slot].toLowerCase()} na ${L.name} ${L.short}${old.title?`, místo "${old.title}"`:''}.
 Profil:
-Máme rádi: ${pr.likes||''}
-Vyhnout se: ${pr.avoid||''}
-Typy a cíle: ${pr.goals||''}
-Rozpočet a čas: ${pr.budget||''}
+${profileText(pr)}
 Chutnalo / oblíbené: ${liked||'zatím nic'}
 Nechutnalo (vyhni se podobnému): ${disliked||'zatím nic'}
 ${pr.learned?'Co o nich víme: '+pr.learned:''}
@@ -466,7 +497,7 @@ function renderShop(){
         <button class="iname" data-ed="${esc(i.id)}"><b>${esc(i.name)}</b> ${i.qty?`<span class="q">${esc(i.qty)}</span>`:''}${i.note?`<div class="mnote">${esc(i.note)}</div>`:''}</button>
         <span class="tagp">${i.price!=null&&i.price!==''?`<span class="p${i.sale?' sale':''}">${kc(i.price)}</span>`:''}${i.sale&&i.regular?`<s>${kc(i.regular)}</s>`:''}</span></div>`;
       if(S.editing===i.id)h+=`<form class="edit" data-form="${esc(i.id)}"><input type="text" id="e-name" value="${esc(i.name)}" aria-label="Název">
-        <div class="two"><input type="text" id="e-qty" value="${esc(i.qty||'')}" placeholder="Množství" aria-label="Množství"><select id="e-store" aria-label="Obchod">${STORES.map(s=>`<option ${s===(i.store||'Kdekoli')?'selected':''}>${s}</option>`).join('')}</select></div>
+        <div class="two"><input type="text" id="e-qty" value="${esc(i.qty||'')}" placeholder="Množství" aria-label="Množství"><select id="e-store" aria-label="Obchod">${[...new Set([...STORES,i.store||'Kdekoli'])].map(s=>`<option ${s===(i.store||'Kdekoli')?'selected':''}>${s}</option>`).join('')}</select></div>
         <input type="text" id="e-note" value="${esc(i.note||'')}" placeholder="Poznámka" aria-label="Poznámka">
         <div class="row"><button class="btn primary" type="submit">Uložit</button><button class="btn ghost" type="button" data-cancel>Zavřít</button><button class="btn ghost" type="button" data-del="${esc(i.id)}" style="margin-left:auto;color:var(--bad)">Smazat</button></div></form>`;
     });
@@ -548,22 +579,178 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.r
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.openRecipe)openRecipe(null)});
 
 /* ---------- profile ---------- */
-const PF=['household','likes','avoid','goals','budget','stores','sites','notes'];
-let profileDirty=false;
-PF.forEach(k=>$('p-'+k).addEventListener('input',()=>{profileDirty=true;$('p-status').textContent='Neuloženo'}));
 function imgSearch(t){return 'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(t)}
-/* weekly routine: profile.week = {"1": "...", ... "7": "..."} (1 = Monday) */
+/* Profile shape: members[{id,name,kind adult|child|toddler,age,lunchAway[1..7],lunchPlace,holidayHome,note}],
+   requirements[{id,text,days[1..7] (empty = always),meal lunch|dinner|day}], likes[], avoid[], allergies[],
+   planning{budget,trips,weekdayTime,weekendTime}, stores[{name,use often|sometimes|no}], sites[{name,url}], notes, learned. 1 = Monday. */
 const DFULL=['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'];
+const DSH=['Po','Út','St','Čt','Pá','So','Ne'];
+const MEALN={lunch:'oběd',dinner:'večeře',day:'celý den'};
+const KINDN={adult:'Dospělý',child:'Dítě',toddler:'Batole'};
+const USEN={often:'Běžně',sometimes:'Občas',no:'Ne'};
+const SUG={likes:['Italská kuchyně','Asijská','Mexická','Česká klasika','Luštěniny','Ryby','Zelenina','Těstoviny','Jednohrncová jídla','Vegetariánská','Sezónní'],
+  avoid:['Ultrazpracované potraviny','Smažené','Vnitřnosti','Houby','Ostré koření'],allergies:['Lepek','Laktóza','Ořechy','Arašídy','Vejce','Ryby','Sója','Celer']};
+const TAGT={likes:'Máme rádi',avoid:'Nejíme',allergies:'Alergie a omezení'};
+const CHEV='<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 function isoDow(iso){const [y,m,d]=iso.split('-').map(Number);return ((new Date(y,m-1,d).getDay()+6)%7)+1}
-function rulesFor(iso){const t=(S.profile?.week||{})[isoDow(iso)];return t&&t.trim()?[{text:t}]:[]}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+function arr(v){return Array.isArray(v)?v.filter(Boolean):(v?String(v).split(/[,;\n]/).map(s=>s.trim()).filter(Boolean):[])}
+function normProfile(p){p=p||{};return {...p,
+  members:Array.isArray(p.members)?p.members:[],requirements:Array.isArray(p.requirements)?p.requirements:[],
+  likes:arr(p.likes),avoid:arr(p.avoid),allergies:arr(p.allergies),planning:(p.planning&&typeof p.planning==='object')?p.planning:{},
+  stores:Array.isArray(p.stores)?p.stores.map(s=>typeof s==='string'?{name:s,use:'often'}:s):arr(p.stores).map(n=>({name:n,use:'often'})),
+  sites:Array.isArray(p.sites)?p.sites.map(s=>typeof s==='string'?{name:s,url:''}:s):arr(p.sites).map(n=>({name:n,url:''})),notes:p.notes||''}}
+function prof(){return normProfile(S.profile)}
+function daysTxt(d){if(!d||!d.length)return 'Vždy';const s=[...d].sort((a,b)=>a-b),j=s.join();
+  if(j==='1,2,3,4,5')return 'Po–Pá';if(j==='1,2,3,4,5,6,7')return 'Každý den';return s.map(i=>DSH[i-1]).join(', ')}
+function rulesFor(iso){const dw=isoDow(iso);return prof().requirements.filter(r=>(r.days||[]).includes(dw)).map(r=>({text:r.text}))}
 function short(t){t=String(t||'').trim();const cut=t.split(/[.:;]/)[0];return cut.length>70?cut.slice(0,68)+'…':cut}
-$('p-week').innerHTML=DFULL.map((n,i)=>`<label class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap"><span class="sub" style="width:64px;flex:none;padding-top:9px;color:var(--ink);font-weight:600">${n}</span><textarea id="p-w${i+1}" rows="1" style="min-height:40px" placeholder="Běžný den"></textarea></label>`).join('');
-for(let i=1;i<=7;i++)$('p-w'+i).addEventListener('input',()=>{profileDirty=true;$('p-status').textContent='Neuloženo'});
-function renderProfile(){const lp=S.profile?.learned;$('p-learned-box').hidden=!lp;$('p-learned').textContent=lp||'';if(profileDirty)return;const p=S.profile||{};PF.forEach(k=>{const el=$('p-'+k);if(document.activeElement!==el)el.value=p[k]||''});for(let i=1;i<=7;i++){const el=$('p-w'+i);if(document.activeElement!==el)el.value=(p.week||{})[i]||''}}
-$('pform').onsubmit=async e=>{e.preventDefault();const data={...(S.profile||{})};PF.forEach(k=>data[k]=$('p-'+k).value.trim());
-  data.week={};for(let i=1;i<=7;i++)data.week[i]=$('p-w'+i).value.trim();delete data.rules;data.updatedAt=new Date().toISOString();
-  if(await write(()=>db.doc('meta/profile').set(data),'Profil uložen.')){profileDirty=false;$('p-status').textContent='';
-    const p=S.plan;const t=todayISO();if(p?.days?.some(d=>d.date>t))$('p-replan').hidden=false}};
+function ageTxt(a){a=parseInt(a,10);if(!a)return '';return a+(a===1?' rok':a<5?' roky':' let')}
+function memberSub(m){return m.kind==='adult'?'dospělý':(ageTxt(m.age)||KINDN[m.kind]?.toLowerCase()||'dítě')}
+function lunchTxt(m){const a=m.lunchAway||[];return a.length?`${daysTxt(a)} oběd ${m.lunchPlace||'mimo domov'}`:'obědvá z domova'}
+function profileText(pr){const p=normProfile(pr);const L=[];
+  if(p.members.length)L.push('Domácnost: '+p.members.map(m=>`${m.name} (${memberSub(m)}; ${lunchTxt(m)}${m.holidayHome!==false&&(m.lunchAway||[]).length?', ve svátek doma':''}${m.note?'; '+m.note:''})`).join(', '));
+  L.push('Alergie a omezení: '+(p.allergies.join(', ')||'žádné'));
+  p.requirements.forEach(r=>L.push(`Požadavek (${daysTxt(r.days)}${r.meal&&r.meal!=='day'?', '+MEALN[r.meal]:''}): ${r.text}`));
+  if(p.likes.length)L.push('Máme rádi: '+p.likes.join(', '));
+  if(p.avoid.length)L.push('Nejíme: '+p.avoid.join(', '));
+  const pl=p.planning;L.push(`Rozpočet: ${pl.budget||'neuveden'} týdně. Nákupů týdně: ${pl.trips||'1–2'}. Vaření ve všední den: ${pl.weekdayTime||'krátce'}, o víkendu: ${pl.weekendTime||'klidně déle'}.`);
+  const st=p.stores.filter(s=>s.use!=='no');if(st.length)L.push('Obchody: '+st.map(s=>s.name+(s.use==='sometimes'?' (občas)':'')).join(', '));
+  if(p.sites.length)L.push('Weby s recepty: '+p.sites.map(s=>s.name).join(', '));
+  return L.join('\n')}
+function storeList(){const s=prof().stores.filter(x=>x.use!=='no').map(x=>x.name);return [...new Set([...(s.length?s:['Kaufland','Albert','Billa','Lidl','Rohlík']),'Kdekoli'])]}
+async function saveProfile(patch,msg){const data={...(S.profile||{}),...patch,updatedAt:new Date().toISOString()};
+  ['household','week','rules','goals','budget'].forEach(k=>delete data[k]);
+  const ok=await write(()=>db.doc('meta/profile').set(data),msg);
+  if(ok){const p=S.plan;const t=todayISO();if(p?.days?.some(d=>d.date>=t))$('p-replan').hidden=false}
+  return ok}
+function reqRow(r,attr){const dd=(r.days||[]).length;return `<button class="prow req" data-preq="${esc(r.id)}"><span class="dtag ${dd?'on':''}">${esc(daysTxt(r.days))}</span><span class="t">${esc(r.text)}${r.meal&&r.meal!=='day'?` <span class="muted">(${MEALN[r.meal]})</span>`:''}</span></button>`}
+function sortedReqs(p){return [...p.requirements].sort((a,b)=>((b.days||[]).length?1:0)-((a.days||[]).length?1:0))}
+function renderProfile(){
+  const ae=document.activeElement;if(ae&&$('p-main').contains(ae)&&ae.matches('input,textarea'))return;
+  const p=prof();const lp=S.profile?.learned;const reqs=sortedReqs(p);let h='';
+  h+=`<div class="pg"><span class="eyebrow">Domácnost</span><div class="pcard">`+
+    p.members.map((m,i)=>`<button class="prow" data-pm="${i}"><span class="av ${m.kind!=='adult'?'kid':''}">${esc((m.name||'?').trim().charAt(0).toUpperCase()||'?')}</span><span class="t"><b>${esc(m.name||'Bez jména')} <span class="muted" style="font-weight:400">· ${esc(memberSub(m))}</span></b><small>${esc(lunchTxt(m))}</small></span>${CHEV}</button>`).join('')+
+    `<button class="prow act" data-pm="new">+ Přidat člena</button>`+
+    `<button class="prow" data-ptags="allergies"><span class="t"><b>Alergie a omezení</b><small>${esc(p.allergies.join(', ')||'Žádné')}</small></span>${CHEV}</button></div></div>`;
+  h+=`<div class="pg"><span class="eyebrow">Požadavky</span><div class="pcard">`+
+    (reqs.length?reqs.slice(0,3).map(r=>reqRow(r)).join(''):`<div class="prow"><span class="t"><small>Zatím žádné. Třeba „V úterý přijedeme pozdě – rychlá večeře“.</small></span></div>`)+
+    `<div style="display:flex;border-top:1px solid var(--line)">${reqs.length>3?`<button class="prow act" style="border:0;flex:1" data-preqs>Všechny (${reqs.length})</button>`:''}<button class="prow act" style="border:0;flex:1;justify-content:flex-end" data-preq="new">+ Přidat</button></div></div></div>`;
+  h+=`<div class="pg"><span class="eyebrow">Chutě</span><div class="pcard pad"><b>Máme rádi</b><div class="tl">${p.likes.map(t=>`<button class="tc" data-ptags="likes">${esc(t)}</button>`).join('')}<button class="tc add" data-ptags="likes">+ přidat</button></div>`+
+    `<b>Nejíme</b><div class="tl">${p.avoid.map(t=>`<button class="tc no" data-ptags="avoid">${esc(t)}</button>`).join('')}<button class="tc add" data-ptags="avoid">+ přidat</button></div></div></div>`;
+  const pl=p.planning;
+  h+=`<div class="pg"><span class="eyebrow">Plánování</span><div class="pcard pad"><div class="pgrid">${[['budget','Rozpočet / týden','2 000 Kč'],['trips','Nákupů týdně','1–2'],['weekdayTime','Vaření všední den','max. 40 min'],['weekendTime','Vaření víkend','klidně déle']].map(([k,l,ph])=>`<label>${l}<input type="text" data-ppl="${k}" value="${esc(pl[k]||'')}" placeholder="${ph}"></label>`).join('')}</div></div></div>`;
+  h+=`<div class="pg"><span class="eyebrow">Obchody</span><div class="pcard pad"><div class="tl">${p.stores.map((s,i)=>`<button class="tc store ${s.use||'often'}" data-pst="${i}" aria-label="${esc(s.name)}: ${USEN[s.use||'often']}">${esc(s.name)}${s.use==='sometimes'?' · občas':''}</button>`).join('')}<button class="tc add" data-pstores>+ přidat obchod</button></div>`+
+    `<span class="sub">Klepnutím přepnete Běžně → Občas → Nepoužíváme. <button class="link" data-pstores>Upravit seznam</button></span></div></div>`;
+  h+=`<div class="pg"><span class="eyebrow">Weby s recepty</span><div class="pcard pad"><div class="tl">${p.sites.map(s=>`<button class="tc" data-psites>${esc(s.name)}</button>`).join('')}<button class="tc add" data-psites>+ přidat web</button></div><button class="link" style="align-self:flex-start" data-psites>Upravit seznam</button></div></div>`;
+  if(lp)h+=`<div class="pg"><span class="eyebrow">Co se Claude naučil z hodnocení</span><div class="pcard pad"><p style="margin:0">${esc(lp)}</p></div></div>`;
+  h+=`<div class="pg"><span class="eyebrow">Tento týden</span><div class="pcard pad"><label for="p-notes" style="font-weight:600">Vzkaz pro příští plán</label><textarea id="p-notes" placeholder="Např. v sobotu máme návštěvu">${esc(p.notes)}</textarea><span class="sub">Všechny změny se ukládají hned.</span></div></div>`;
+  $('p-main').innerHTML=h;
+}
+$('p-main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(d.pm!=null)openPS({type:'member',idx:d.pm==='new'?-1:+d.pm});
+  else if(d.preq!=null)openPS({type:'req',id:d.preq});
+  else if('preqs' in d)openPS({type:'reqs'});
+  else if(d.ptags)openPS({type:'tags',key:d.ptags});
+  else if(d.pst!=null){const st=prof().stores.map(s=>({...s}));const s=st[+d.pst];s.use={often:'sometimes',sometimes:'no',no:'often'}[s.use||'often'];saveProfile({stores:st})}
+  else if('pstores' in d)openPS({type:'stores'});
+  else if('psites' in d)openPS({type:'sites'})});
+$('p-main').addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.ppl){const p=prof();saveProfile({planning:{...p.planning,[t.dataset.ppl]:t.value.trim()}},'Uloženo.')}
+  else if(t.id==='p-notes')saveProfile({notes:t.value.trim()},'Vzkaz uložen.')});
+
+/* profile editors (full-screen sheet) */
+S.ps=null;
+function openPS(o){const p=prof();
+  if(o?.type==='member')o.d=o.idx>=0?JSON.parse(JSON.stringify(p.members[o.idx])):{id:uid(),name:'',kind:'adult',age:'',lunchAway:[],lunchPlace:'',holidayHome:true,note:''};
+  if(o?.type==='req'){const r=p.requirements.find(x=>x.id===o.id);o.isNew=!r;o.d=r?{...r,days:[...(r.days||[])]}:{id:uid(),text:'',days:[],meal:'day'};o.mode=o.d.days.length?'days':'always'}
+  if(o?.type==='sites')o.edit=-1;
+  S.ps=o||null;renderPS();if(o)$('psheet').scrollTop=0}
+function closePS(){const o=S.ps;openPS(o?.back==='reqs'?{type:'reqs'}:null)}
+function syncPS(){const o=S.ps;if(!o)return;
+  if(o.type==='member'){const m=o.d;m.name=$('pm-name').value;if($('pm-age'))m.age=$('pm-age').value.trim();m.lunchPlace=$('pm-place').value.trim();m.holidayHome=$('pm-hol').checked;m.note=$('pm-note').value.trim()}
+  if(o.type==='req')o.d.text=$('pr-text').value}
+function renderPS(){const el=$('psheet');const o=S.ps;
+  if(!o){el.hidden=true;el.innerHTML='';document.body.style.overflow='';return}
+  el.hidden=false;document.body.style.overflow='hidden';const p=prof();let h='';
+  const back=`<div class="pshead"><button class="link" data-ps="close">‹ ${o.back==='reqs'?'Požadavky':'Profil'}</button></div>`;
+  const saveHead=`<div class="pshead"><button class="link" data-ps="close">Zrušit</button><button class="link" data-ps="save" style="font-weight:800">Uložit</button></div>`;
+  const title=t=>`<h2 id="ps-title" style="margin:4px 0 0">${t}</h2>`;
+  if(o.type==='member'){const m=o.d;
+    h=saveHead+`<div class="psbody">${title(o.idx>=0?'Člen domácnosti':'Nový člen')}
+    <div class="pcard pad"><label class="stack" style="gap:4px"><span class="sub">Jméno</span><input type="text" id="pm-name" value="${esc(m.name)}" placeholder="Např. Máma"></label>
+      <div class="stack" style="gap:4px"><span class="sub">Kdo to je</span><div class="seg wide" role="group" aria-label="Kdo to je">${['adult','child','toddler'].map(k=>`<button data-kind="${k}" aria-pressed="${m.kind===k}">${KINDN[k]}</button>`).join('')}</div></div>
+      ${m.kind!=='adult'?`<label class="stack" style="gap:4px"><span class="sub">Kolik let</span><input type="text" id="pm-age" inputmode="numeric" value="${esc(m.age||'')}"></label>`:''}</div>
+    <div class="pcard pad"><b>Oběd</b><span class="sub">Ve které dny obědvá mimo domov (školka, škola, jídelna v práci)?</span>
+      <div class="days7">${DSH.map((n,i)=>`<button data-day="${i+1}" aria-pressed="${(m.lunchAway||[]).includes(i+1)}" aria-label="${DFULL[i]}">${n}</button>`).join('')}</div>
+      <label class="stack" style="gap:4px"><span class="sub">Kde</span><input type="text" id="pm-place" value="${esc(m.lunchPlace||'')}" placeholder="Např. ve školce"></label>
+      <label class="check">Ve svátek obědvá doma<input type="checkbox" id="pm-hol" ${m.holidayHome!==false?'checked':''}></label></div>
+    <div class="pcard pad"><label class="stack" style="gap:4px"><span class="sub">Poznámka k jídlu</span><input type="text" id="pm-note" value="${esc(m.note||'')}" placeholder="Např. bez ostrého koření"></label></div>
+    ${o.idx>=0?`<button class="danger" data-ps="del">Odebrat člena</button>`:''}</div>`}
+  if(o.type==='req'){const r=o.d;
+    h=saveHead+`<div class="psbody">${title('Požadavek')}
+    <div class="pcard pad"><label for="pr-text" style="font-weight:700">Co potřebujete</label><textarea id="pr-text" placeholder="Např. přijedeme pozdě – rychlá večeře do 20 minut">${esc(r.text)}</textarea>
+      <div class="tl"><span class="sub" style="align-self:center">Návrhy:</span>${['Rychlá večeře do 20 minut','Bez masa','Nevaříme','Návštěva – víc porcí','Studená večeře'].map(s=>`<button class="tc" data-sug="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>
+    <div class="pcard pad"><b>Kdy platí</b><div class="seg wide" role="group" aria-label="Kdy platí"><button data-mode="always" aria-pressed="${o.mode==='always'}">Vždy</button><button data-mode="days" aria-pressed="${o.mode==='days'}">Vybrané dny</button></div>
+      ${o.mode==='days'?`<div class="days7">${DSH.map((n,i)=>`<button data-day="${i+1}" aria-pressed="${r.days.includes(i+1)}" aria-label="${DFULL[i]}">${n}</button>`).join('')}</div>`:''}</div>
+    <div class="pcard pad"><b>Týká se</b><div class="seg wide" role="group" aria-label="Týká se">${[['lunch','Oběda'],['dinner','Večeře'],['day','Celého dne']].map(([k,l])=>`<button data-meal="${k}" aria-pressed="${(r.meal||'day')===k}">${l}</button>`).join('')}</div></div>
+    ${!o.isNew?`<button class="danger" data-ps="del">Smazat požadavek</button>`:''}</div>`}
+  if(o.type==='reqs'){const rs=sortedReqs(p);const dd=rs.filter(r=>(r.days||[]).length),al=rs.filter(r=>!(r.days||[]).length);
+    h=back+`<div class="psbody">${title('Požadavky')}<p class="sub" style="margin:0">Cokoli, na co má jídelníček myslet – pořád, nebo jen v určité dny.</p>
+    ${dd.length?`<div class="pg"><span class="eyebrow">Jen v některé dny</span><div class="pcard">${dd.map(r=>reqRow(r)).join('')}</div></div>`:''}
+    ${al.length?`<div class="pg"><span class="eyebrow">Vždy</span><div class="pcard">${al.map(r=>reqRow(r)).join('')}</div></div>`:''}
+    <button class="btn primary" style="min-height:48px" data-preq="new">+ Přidat požadavek</button></div>`}
+  if(o.type==='tags'){const k=o.key;const list=p[k];const sug=SUG[k].filter(s=>!list.some(x=>x.toLowerCase()===s.toLowerCase()));
+    h=back+`<div class="psbody">${title(TAGT[k])}
+    <div class="pcard pad"><form class="addrow" data-addtag><input type="text" id="pt-new" placeholder="Napište a přidejte…" aria-label="Přidat položku"><button aria-label="Přidat" type="submit">+</button></form>
+      <div class="tl">${list.length?list.map((t,i)=>`<span class="tc ${k!=='likes'?'no':''}">${esc(t)}<button class="x" data-rmtag="${i}" aria-label="Odebrat ${esc(t)}">×</button></span>`).join(''):'<span class="sub">Zatím nic.</span>'}</div></div>
+    ${sug.length?`<div class="pg"><span class="eyebrow">Klepnutím přidáte</span><div class="tl">${sug.map(s=>`<button class="tc add" style="border-style:solid;color:var(--ink);font-weight:400" data-addsug="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`:''}</div>`}
+  if(o.type==='stores'){
+    h=back+`<div class="psbody">${title('Obchody')}<p class="sub" style="margin:0">Na každý nákup se vybere jeden obchod, kde to vyjde nejlevněji. Název přepíšete klepnutím, křížkem obchod smažete.</p>
+    <div class="pcard">${p.stores.map((s,i)=>`<div class="srow"><input type="text" value="${esc(s.name)}" data-stname="${i}" aria-label="Název obchodu"><div class="seg" role="group" aria-label="${esc(s.name)}">${['often','sometimes','no'].map(u=>`<button data-stuse="${i}" data-u="${u}" aria-pressed="${(s.use||'often')===u}">${USEN[u]}</button>`).join('')}</div><button class="x" data-strm="${i}" aria-label="Smazat ${esc(s.name)}">×</button></div>`).join('')}
+      <form class="addrow" data-addstore style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="pst-new" placeholder="Přidat obchod (např. Penny, trh)" aria-label="Nový obchod"><button type="submit" aria-label="Přidat obchod">+</button></form></div></div>`}
+  if(o.type==='sites'){
+    h=back+`<div class="psbody">${title('Weby s recepty')}<p class="sub" style="margin:0">Odtud se hledají recepty a ke každému jídlu se přidá odkaz. Klepnutím web upravíte, křížkem smažete.</p>
+    <div class="pcard pad"><b>Přidat web</b><form class="stack" data-addsite style="gap:8px"><input type="text" id="psi-name" placeholder="Název, např. Toprecepty" aria-label="Název webu"><input type="text" id="psi-url" placeholder="Adresa (nepovinné), např. toprecepty.cz" aria-label="Adresa webu"><button class="btn primary" type="submit" style="min-height:44px">Přidat</button></form></div>
+    <div class="pg"><span class="eyebrow">Naše weby</span><div class="pcard">${p.sites.map((s,i)=>o.edit===i
+      ?`<div class="stack" style="gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:#f7f9f6"><label class="stack" style="gap:4px"><span class="sub">Název</span><input type="text" id="pse-name" value="${esc(s.name)}"></label><label class="stack" style="gap:4px"><span class="sub">Adresa</span><input type="text" id="pse-url" value="${esc(s.url||'')}" placeholder="nepovinné"></label><div class="row"><button class="btn primary" data-sitesave="${i}">Uložit</button><button class="btn" data-siterm="${i}" style="color:#a1331a">Smazat</button><button class="btn ghost" data-siteedit="-1">Zrušit</button></div></div>`
+      :`<div class="srow"><button class="prow" style="border:0;padding:0" data-siteedit="${i}"><span class="t"><b>${esc(s.name)}</b>${s.url?`<small>${esc(s.url)}</small>`:''}</span></button><button class="x" data-siterm="${i}" aria-label="Smazat ${esc(s.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím žádné.</small></span></div>'}</div></div></div>`}
+  el.innerHTML=h}
+$('psheet').addEventListener('click',async e=>{const b=e.target.closest('button');const o=S.ps;if(!b||!o||b.type==='submit')return;const d=b.dataset;const p=prof();
+  if(d.ps==='close')return closePS();
+  if(o.type==='member'){syncPS();const m=o.d;
+    if(d.kind){m.kind=d.kind;return renderPS()}
+    if(d.day){const n=+d.day;m.lunchAway=(m.lunchAway||[]).includes(n)?m.lunchAway.filter(x=>x!==n):[...(m.lunchAway||[]),n].sort((a,b)=>a-b);return renderPS()}
+    if(d.ps==='save'){if(!m.name.trim())return toast('Napište jméno.');m.name=m.name.trim();if(m.kind==='adult')m.age='';const ms=[...p.members];if(o.idx>=0)ms[o.idx]=m;else ms.push(m);if(await saveProfile({members:ms},'Uloženo.'))closePS();return}
+    if(d.ps==='del'){if(await saveProfile({members:p.members.filter((_,i)=>i!==o.idx)},'Člen odebrán.'))closePS();return}}
+  if(o.type==='req'){syncPS();const r=o.d;
+    if(d.sug){const t=r.text.trim();r.text=t?t+(/[.!?]$/.test(t)?' ':', ')+d.sug.toLowerCase():d.sug;return renderPS()}
+    if(d.mode){o.mode=d.mode;return renderPS()}
+    if(d.day){const n=+d.day;r.days=r.days.includes(n)?r.days.filter(x=>x!==n):[...r.days,n].sort((a,b)=>a-b);return renderPS()}
+    if(d.meal){r.meal=d.meal;return renderPS()}
+    if(d.ps==='save'){r.text=r.text.trim();if(!r.text)return toast('Napište, co potřebujete.');
+      if(o.mode==='always')r.days=[];else if(!r.days.length)return toast('Vyberte aspoň jeden den.');
+      const rs=[...p.requirements];const at=rs.findIndex(x=>x.id===r.id);if(at>=0)rs[at]=r;else rs.push(r);
+      if(await saveProfile({requirements:rs},'Uloženo.'))closePS();return}
+    if(d.ps==='del'){if(await saveProfile({requirements:p.requirements.filter(x=>x.id!==r.id)},'Požadavek smazán.'))closePS();return}}
+  if(o.type==='reqs'&&d.preq!=null)return openPS({type:'req',id:d.preq,back:'reqs'});
+  if(o.type==='tags'){const k=o.key;
+    if(d.rmtag!=null){await saveProfile({[k]:p[k].filter((_,i)=>i!==+d.rmtag)});return renderPS()}
+    if(d.addsug){await saveProfile({[k]:[...p[k],d.addsug]});return renderPS()}}
+  if(o.type==='stores'){
+    if(d.stuse!=null){const st=p.stores.map(s=>({...s}));st[+d.stuse].use=d.u;await saveProfile({stores:st});return renderPS()}
+    if(d.strm!=null){await saveProfile({stores:p.stores.filter((_,i)=>i!==+d.strm)},'Obchod smazán.');return renderPS()}}
+  if(o.type==='sites'){
+    if(d.siteedit!=null){o.edit=+d.siteedit;return renderPS()}
+    if(d.sitesave!=null){const name=$('pse-name').value.trim();if(!name)return toast('Napište název.');const si=p.sites.map(s=>({...s}));si[+d.sitesave]={name,url:$('pse-url').value.trim()};o.edit=-1;await saveProfile({sites:si},'Uloženo.');return renderPS()}
+    if(d.siterm!=null){o.edit=-1;await saveProfile({sites:p.sites.filter((_,i)=>i!==+d.siterm)},'Web smazán.');return renderPS()}}});
+$('psheet').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;const o=S.ps;if(!o)return;const p=prof();
+  if('addtag' in f.dataset){const v=$('pt-new').value.trim();if(!v)return;if(!p[o.key].some(x=>x.toLowerCase()===v.toLowerCase()))await saveProfile({[o.key]:[...p[o.key],v]});renderPS();$('pt-new')?.focus()}
+  if('addstore' in f.dataset){const v=$('pst-new').value.trim();if(!v)return;await saveProfile({stores:[...p.stores,{name:v,use:'often'}]},'Obchod přidán.');renderPS()}
+  if('addsite' in f.dataset){const v=$('psi-name').value.trim();if(!v)return toast('Napište název webu.');await saveProfile({sites:[...p.sites,{name:v,url:$('psi-url').value.trim()}]},'Web přidán.');renderPS()}});
+$('psheet').addEventListener('change',e=>{const t=e.target;if(S.ps?.type!=='stores'||t.dataset.stname==null)return;const p=prof();const i=+t.dataset.stname;const v=t.value.trim();
+  if(!v){t.value=p.stores[i].name;return}const st=p.stores.map(s=>({...s}));st[i].name=v;saveProfile({stores:st},'Přejmenováno.')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.ps)closePS()});
 $('p-replan-no').onclick=()=>{$('p-replan').hidden=true};
 $('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const from=d.getHours()<14?t:(()=>{d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
   const old=(S.requests||[]).filter(r=>r.type==='replan');for(const r of old)await write(()=>db.doc('meta/'+r.id).delete());
@@ -573,6 +760,7 @@ $('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const f
 /* ---------- render + data ---------- */
 function render(){
   const p=S.plan;$('hdr').textContent=p?.weekLabel||'';
+  const ns=storeList();if(ns.join()!==STORES.join()){const cur=$('add-store').value;STORES=ns;$('add-store').innerHTML=STORES.map(s=>`<option ${s===(STORES.includes(cur)?cur:'Kdekoli')?'selected':''}>${esc(s)}</option>`).join('')}
   if(S.view==='tyden')renderWeek();
   renderShop();renderRecipes();renderProfile();
   if(S.openRecipe)renderSheet();
