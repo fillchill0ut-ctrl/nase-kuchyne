@@ -793,7 +793,7 @@ function dealRow(f,i,hit){const inList=onList(f.name,f.store);const reg=kcNum(f.
     <button class="btn ${inList?'done':''}" data-addeal="${i}" ${inList?'disabled':''}>${inList?'Na seznamu ✓':'+ Na seznam'}</button></div>`}
 function renderDeals(){
   const ae=document.activeElement;if(ae&&$('sl-main').contains(ae)&&ae.matches('input'))return;
-  const w=S.watch||{};const list=Array.isArray(w.list)?w.list:[];const found=Array.isArray(w.found)?w.found:[];
+  const w=S.watch||(typeof MEM!=='undefined'&&MEM.docs.get('watch'))||{};const list=Array.isArray(w.list)?w.list:[];const found=Array.isArray(w.found)?w.found:[];
   const waiting=(S.requests||[]).some(r=>r.type==='deals'&&r.status==='waiting');
   const rows=[];S.dealRows=rows;
   const stores=storeList().filter(s=>s!=='Kdekoli');
@@ -817,12 +817,12 @@ function renderDeals(){
 async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||{}),list}),msg)}
 $('sl-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;
   if(b.id==='sl-check'){const id='req-'+Date.now().toString(36);if(await write(()=>db.doc('meta/'+id).set({type:'deals',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi.'))renderDeals();return}
-  if(b.dataset.wrm!=null){const l=[...(S.watch?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
+  if(b.dataset.wrm!=null){const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
   if(b.dataset.addeal!=null){const f=S.dealRows[+b.dataset.addeal];if(!f)return;const pr=kcNum(f.price),reg=kcNum(f.regular);
     await write(()=>db.collection('items').add({name:f.name,qty:'',store:f.store||'Kdekoli',cat:guessCat(f.name),price:pr,regular:reg,sale:true,checked:false,source:'manual',note:f.until?'Akce do '+f.until:'Akce',trip:1,order:Date.now()}),'Přidáno na seznam.');renderDeals()}});
-$('sl-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('sl-new').value.trim();if(!v)return;const l=[...(S.watch?.list||[])];
+$('sl-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('sl-new').value.trim();if(!v)return;const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];
   if(l.some(x=>normName(x.name)===normName(v))){toast('Už hlídáme.');return}l.push({id:uid(),name:v});if(await saveWatch(l,'Přidáno – zkontroluje se při další kontrole.')){renderDeals();$('sl-new')?.focus()}});
-$('sl-main').addEventListener('change',e=>{const t=e.target;if(t.dataset.wname==null)return;const l=(S.watch?.list||[]).map(x=>({...x}));const i=+t.dataset.wname;const v=t.value.trim();
+$('sl-main').addEventListener('change',e=>{const t=e.target;if(t.dataset.wname==null)return;const l=((S.watch||MEM.docs.get('watch'))?.list||[]).map(x=>({...x}));const i=+t.dataset.wname;const v=t.value.trim();
   if(!v){t.value=l[i].name;return}l[i].name=v;saveWatch(l,'Uloženo.')});
 
 /* ---------- render + data ---------- */
@@ -836,6 +836,6 @@ function render(){
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="src/data-layer.js"></script>
+<script src="src/data-layer.js?v=10"></script>
 </body>
 </html>
