@@ -789,25 +789,37 @@ async function consumePantry(){
     for(const slot of ['lunch','dinner','dessert']){const m=d[slot];if(!m||!Array.isArray(m.pantry)||!m.pantry.length)continue;const key=d.date+':'+slot;if(done.has(key))continue;
       done.add(key);changed=true;
       for(const u of m.pantry){const k=normName(u.name);const i=items.findIndex(x=>normName(x.name)===k);const j=i>=0?i:items.findIndex(x=>normName(x.name).includes(k)||k.includes(normName(x.name)));
-        if(j<0)continue;if(u.left)items[j].qty=u.left;else items.splice(j,1)}}}
+        if(j<0)continue;const L=u.left;
+        if(!L){items.splice(j,1);continue}
+        if(typeof L==='object'){if(L.pcs!=null)items[j].pcs=String(L.pcs);if(L.weight!=null)items[j].weight=normW(L.weight)}
+        else{const t=String(L);if(/ks\b/.test(t)||/^\d+$/.test(t.trim()))items[j].pcs=t.replace(/\s*ks\b/,'').trim();else items[j].weight=normW(t)}
+        delete items[j].qty}}}
   if(!changed)return;pantryBusy=true;try{await savePantry({items,done:[...done].slice(-60)})}finally{pantryBusy=false}}
+function normW(v){v=String(v||'').trim();if(!v)return '';if(/^\d+([.,]\d+)?$/.test(v))return v+' g';return v.replace(/(\d)\s*(kg|g|ml|l)\b/i,'$1 $2')}
+function pItem(x){/* old entries had one free-text qty */if(x.qty&&x.pcs==null&&x.weight==null){const t=String(x.qty).trim();if(/^\d+\s*(ks)?$/i.test(t))return {...x,pcs:t.replace(/\s*ks/i,''),weight:''};return {...x,pcs:'',weight:normW(t)}}return {pcs:'',weight:'',...x}}
+const PG='display:grid;grid-template-columns:minmax(0,1fr) 56px 88px 36px;gap:6px;align-items:center';
 function renderPantry(){
   const ae=document.activeElement;if(ae&&$('dm-main').contains(ae)&&ae.matches('input'))return;
-  const items=pantryDoc().items||[];const sug=PANTRY_SUG.filter(s=>!items.some(x=>normName(x.name)===normName(s)));
-  let h=`<div class="pcard">${items.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-pname="${i}" aria-label="Potravina"><input type="text" value="${esc(x.qty||'')}" data-pqty="${i}" placeholder="množství" aria-label="Množství" style="flex:0 0 96px;font-weight:400;color:var(--muted);text-align:right"><button class="x" data-prm="${i}" aria-label="Smazat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co máte ve spíži a v lednici.</small></span></div>'}
-    <form class="addrow" id="dm-add" style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="dm-new" placeholder="Např. cibule" aria-label="Přidat potravinu"><input type="text" id="dm-qty" placeholder="kolik" aria-label="Množství" style="flex:0 0 84px"><button type="submit" aria-label="Přidat">+</button></form></div>`;
+  const items=(pantryDoc().items||[]).map(pItem);const sug=PANTRY_SUG.filter(s=>!items.some(x=>normName(x.name)===normName(s)));
+  const inp='border:1px solid var(--line);border-radius:8px;padding:7px 6px;text-align:right;min-width:0';
+  let h=`<div class="pcard"><div style="${PG};padding:10px 8px 6px 16px"><span class="eyebrow">Potravina</span><span class="eyebrow" style="text-align:right">Počet ks</span><span class="eyebrow" style="text-align:right">Hmotnost</span><span></span></div>`+
+    (items.map((x,i)=>`<div style="${PG};padding:4px 8px 4px 16px;border-top:1px solid var(--line)"><input type="text" value="${esc(x.name)}" data-pname="${i}" aria-label="Potravina" style="border:0;padding:8px 0;font-weight:600;background:transparent;min-width:0"><input type="text" inputmode="numeric" value="${esc(x.pcs||'')}" data-ppcs="${i}" placeholder="–" aria-label="Počet kusů ${esc(x.name)}" style="${inp}"><input type="text" value="${esc(x.weight||'')}" data-pw="${i}" placeholder="g / kg" aria-label="Hmotnost ${esc(x.name)}" style="${inp}"><button class="x" data-prm="${i}" aria-label="Smazat ${esc(x.name)}" style="width:36px;height:44px;border:0;background:none;color:var(--muted);font-size:20px">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co máte ve spíži a v lednici.</small></span></div>')+
+    `<form id="dm-add" style="${PG};padding:10px 8px 10px 16px;border-top:1px solid var(--line)"><input type="text" id="dm-new" placeholder="Např. cibule" aria-label="Přidat potravinu"><input type="text" inputmode="numeric" id="dm-pcs" placeholder="ks" aria-label="Počet kusů" style="${inp}"><input type="text" id="dm-w" placeholder="g / kg" aria-label="Hmotnost" style="${inp}"><button type="submit" aria-label="Přidat" style="width:36px;height:44px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:20px">+</button></form></div>
+    <p class="sub" style="margin:0">Hmotnost stačí napsat číslem v gramech (500 = 500 g), nebo s jednotkou (1 kg, 400 ml).</p>`;
   if(sug.length)h+=`<div class="pg"><span class="eyebrow">Klepnutím přidáte</span><div class="tl">${sug.map(s=>`<button class="tc add" style="border-style:solid;color:var(--ink);font-weight:400" data-padd="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`;
   $('dm-main').innerHTML=h}
-$('dm-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;const items=[...(pantryDoc().items||[])];
+function pList(){return (pantryDoc().items||[]).map(x=>{const y=pItem(x);delete y.qty;return y})}
+$('dm-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;const items=pList();
   if(b.dataset.prm!=null){items.splice(+b.dataset.prm,1);await savePantry({items});return}
-  if(b.dataset.padd){items.push({id:uid(),name:b.dataset.padd,qty:''});await savePantry({items});return}});
-$('dm-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('dm-new').value.trim();if(!v)return;const items=[...(pantryDoc().items||[])];
-  const at=items.findIndex(x=>normName(x.name)===normName(v));const q=$('dm-qty').value.trim();
-  if(at>=0)items[at]={...items[at],qty:q||items[at].qty};else items.push({id:uid(),name:v,qty:q});
+  if(b.dataset.padd){items.push({id:uid(),name:b.dataset.padd,pcs:'',weight:''});await savePantry({items});return}});
+$('dm-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('dm-new').value.trim();if(!v)return;const items=pList();
+  const at=items.findIndex(x=>normName(x.name)===normName(v));const pcs=$('dm-pcs').value.trim(),w=normW($('dm-w').value);
+  if(at>=0)items[at]={...items[at],pcs:pcs||items[at].pcs,weight:w||items[at].weight};else items.push({id:uid(),name:v,pcs,weight:w});
   if(await savePantry({items},'Přidáno.')){renderPantry();$('dm-new')?.focus()}});
-$('dm-main').addEventListener('change',e=>{const t=e.target;const items=(pantryDoc().items||[]).map(x=>({...x}));
+$('dm-main').addEventListener('change',e=>{const t=e.target;const items=pList();
   if(t.dataset.pname!=null){const i=+t.dataset.pname,v=t.value.trim();if(!v){t.value=items[i].name;return}items[i].name=v;savePantry({items})}
-  else if(t.dataset.pqty!=null){items[+t.dataset.pqty].qty=t.value.trim();savePantry({items})}});
+  else if(t.dataset.ppcs!=null){items[+t.dataset.ppcs].pcs=t.value.trim();savePantry({items})}
+  else if(t.dataset.pw!=null){const v=normW(t.value);t.value=v;items[+t.dataset.pw].weight=v;savePantry({items})}});
 
 /* ---------- render + data ---------- */
 function render(){
