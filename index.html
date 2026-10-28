@@ -273,9 +273,7 @@ nav.tabs button{font-size:12px}
         <p class="sub" style="margin:0">Odkaz z webu, Instagramu, TikToku, YouTube… Claude recept načte, převede do aplikace a napíše, jestli se to povedlo.</p>
         <input type="url" id="imp-url" placeholder="https://…" aria-label="Odkaz na recept" required>
         <textarea id="imp-note" placeholder="Poznámka (nepovinné) – u videa sem můžete vložit popis nebo suroviny" style="min-height:60px"></textarea>
-        <div class="seg wide" role="group" aria-label="Co s receptem"><button type="button" data-imode="save" aria-pressed="true">Jen uložit</button><button type="button" data-imode="plan" aria-pressed="false">Do tohoto týdne</button></div>
-        <div class="row" id="imp-plan" hidden style="flex-wrap:nowrap"><select id="imp-day" aria-label="Den" style="flex:1"></select><select id="imp-slot" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div>
-        <p class="sub" id="imp-hint" style="margin:0">Uložený recept Claude zařadí do jídelníčku sám, až se bude hodit k akcím nebo k tomu, co máte doma.</p>
+        <p class="sub" style="margin:0">Až bude recept načtený, přidáte ho do týdne tlačítkem u receptu. Claude ho také zařadí sám, až se bude hodit k akcím nebo k tomu, co máte doma.</p>
         <div class="row"><button class="btn primary" type="submit">Uložit recept</button><span class="sub" id="imp-status"></span></div>
       </form>
     </section>
@@ -570,29 +568,30 @@ function renderRecipes(){
   const el=$('r-list');
   if(!S.loaded.recipes){el.innerHTML='<p class="sub">Načítám recepty…</p>';return}
   if(!rs.length){el.innerHTML=`<div class="empty">${q?'Nic takového tu není.':'Zatím žádné recepty. Přibudou s prvním plánem, nebo vložte vlastní níže.'}</div>`;return}
-  el.innerHTML=rs.map(r=>`<button class="rcard" data-open="${esc(r.id)}"><span class="thumb">${pic(r,r.id)}</span><span style="min-width:0"><h3>${r.fav?'★ ':''}${esc(r.title)}</h3>
+  el.innerHTML=rs.map(r=>`<div class="stack" style="gap:6px"><button class="rcard" data-open="${esc(r.id)}"><span class="thumb">${pic(r,r.id)}</span><span style="min-width:0"><h3>${r.fav?'★ ':''}${esc(r.title)}</h3>
     <div class="sub num" style="margin-bottom:6px">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}${r.rating==='up'?' · chutnalo':r.rating==='down'?' · nechutnalo':''}</div>
-    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>`).join('');
+    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>${r.saved&&r.importStatus!=='waiting'?`<div class="row" style="gap:8px"><button class="btn" data-addweek="${esc(r.id)}" style="padding:6px 12px">+ Přidat do týdne</button></div><div data-pick="${esc(r.id)}"></div>`:''}</div>`).join('');
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
+  el.querySelectorAll('[data-addweek]').forEach(b=>b.onclick=()=>{const id=b.dataset.addweek,box=el.querySelector(`[data-pick="${CSS.escape(id)}"]`);
+    if(box.innerHTML){box.innerHTML='';return}box.innerHTML=pickerHTML('pk-'+id);bindPicker('pk-'+id,id,()=>{box.innerHTML=''})});
 }
 $('r-q').oninput=e=>{S.q=e.target.value;renderRecipes()};
 /* ---------- import recipe from a link: recipe placeholder + req {type:'import'} handled by the scheduled task ---------- */
-S.imode='save';
 function planDayOptions(sel){const t=todayISO();const ds=(S.plan?.days||[]).filter(d=>d.date>=t);
   return ds.map(d=>{const L=dateLabel(d.date);return `<option value="${d.date}" ${d.date===sel?'selected':''}>${L.name} ${L.short}</option>`}).join('')}
-function setImode(m){S.imode=m;document.querySelectorAll('#imp-form [data-imode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.imode===m));
-  $('imp-plan').hidden=m!=='plan';$('imp-hint').textContent=m==='plan'?'Claude recept zařadí na vybraný den, přepočítá porce a doplní nákupní seznam.':'Uložený recept Claude zařadí do jídelníčku sám, až se bude hodit k akcím nebo k tomu, co máte doma.';
-  if(m==='plan'){$('imp-day').innerHTML=planDayOptions()||'<option value="">Tento týden už nezbývá žádný den</option>'}}
-document.querySelectorAll('#imp-form [data-imode]').forEach(b=>b.onclick=()=>setImode(b.dataset.imode));
+function pickerHTML(k){const o=planDayOptions();if(!o)return '<p class="sub" style="margin:0">Tento týden už nezbývá žádný den.</p>';
+  return `<div class="panel stack" style="gap:8px"><div class="row" style="flex-wrap:nowrap"><select id="${k}-d" aria-label="Den" style="flex:1">${o}</select><select id="${k}-s" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div><div class="row"><button class="btn primary" id="${k}-go">Přidat</button><span class="sub">Claude přepočítá porce na ten den a doplní nákupní seznam – do 2 hodin.</span></div></div>`}
+function bindPicker(k,id,done){const go=document.getElementById(k+'-go');if(!go)return;const r=S.recipes.get(id)||{};
+  go.onclick=async()=>{const date=document.getElementById(k+'-d').value,slot=document.getElementById(k+'-s').value;
+    if(await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url:r.sourceUrl||'',plan:{date,slot},onlyPlace:true,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi – recept zařadí do 2 hodin.'))done()}}
 function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}}
 $('imp-form').onsubmit=async e=>{e.preventDefault();const url=$('imp-url').value.trim();if(!/^https?:\/\//i.test(url)){$('imp-status').textContent='Vložte celý odkaz začínající https://';return}
-  const plan=S.imode==='plan'&&$('imp-day').value?{date:$('imp-day').value,slot:$('imp-slot').value}:null;
-  if(S.imode==='plan'&&!plan){$('imp-status').textContent='Vyberte den.';return}
+  const plan=null;
   const id='r-'+Date.now().toString(36),host=hostOf(url),now=new Date().toISOString();
   const ok=await write(()=>db.doc('recipes/'+id).set({title:'Recept z '+(host||'odkazu'),sourceUrl:url,sourceLabel:host,source:'Uložený odkaz',saved:true,importStatus:'waiting',importNote:'',userNote:$('imp-note').value.trim(),wantPlan:plan,ingredients:[],steps:[],tags:['uložené'],fav:false,rating:null,createdAt:now}));
   if(!ok)return;
-  await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url,note:$('imp-note').value.trim(),plan,status:'waiting',createdAt:now}),plan?'Uloženo. Claude recept načte a zařadí do týdne – do 2 hodin.':'Uloženo. Claude recept načte do 2 hodin.');
-  $('imp-url').value='';$('imp-note').value='';setImode('save')};
+  await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url,note:$('imp-note').value.trim(),plan,status:'waiting',createdAt:now}),'Uloženo. Claude recept načte do 2 hodin.');
+  $('imp-url').value='';$('imp-note').value=''};
 function openRecipe(id){S.openRecipe=id||null;renderSheet()}
 function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.recipes.get(id);
   if(r&&!sh.hidden&&sh.dataset.rid===id&&$('sh-editbox')?.innerHTML)return; sh.dataset.rid=id||'';
@@ -611,15 +610,14 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.r
     <div class="row"><button class="btn" id="sh-add">Přidat suroviny na seznam</button><a class="btn" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Fotky tohoto jídla ↗</a></div>
     ${r.sourceUrl?`<a class="panel" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:var(--ink)"><span class="eyebrow">Recept na webu</span><br><b>${esc(r.sourceLabel||r.sourceUrl.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</b> ↗</a>`:''}
     <h3>Postup</h3><ol>${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
-    <div class="panel stack" style="gap:8px"><h3>Zařadit do tohoto týdne</h3>${planDayOptions()?`<div class="row" style="flex-wrap:nowrap"><select id="sh-pday" aria-label="Den" style="flex:1">${planDayOptions()}</select><select id="sh-pslot" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div><button class="btn primary" id="sh-place" style="align-self:flex-start">Zařadit</button><span class="sub">Claude přepočítá porce na ten den a doplní nákupní seznam – do 2 hodin.</span>`:'<span class="sub">Tento týden už nezbývá žádný den.</span>'}</div>
+    ${r.importStatus==='waiting'?'':`<div class="stack" style="gap:8px"><h3>Přidat do týdne</h3>${pickerHTML('shp')}</div>`}
     <div class="row"><button class="btn" id="sh-edit">Upravit recept</button><button class="btn" id="sh-del" style="color:#a1331a">Smazat recept</button></div>
     <div id="sh-editbox"></div>
     <h3>Jak chutnalo?</h3><div class="row"><button class="btn rate" data-rate="up" aria-pressed="${r.rating==='up'}">Chutnalo</button><button class="btn rate" data-rate="down" aria-pressed="${r.rating==='down'}">Nechutnalo</button></div>
     <p class="sub">Oblíbené a hodnocení se ukládají pro vás oba a Claude podle nich skládá další plány: oblíbená jídla občas zopakuje, podobná přidá a těm, co nechutnala, se vyhne.${src?' Zdroj: '+src:''}</p></div>`;
   sh.hidden=false;document.body.style.overflow='hidden';
   $('sh-x').onclick=()=>openRecipe(null);
-  if($('sh-place'))$('sh-place').onclick=async()=>{const date=$('sh-pday').value,slot=$('sh-pslot').value;
-    if(await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url:r.sourceUrl||'',plan:{date,slot},onlyPlace:r.importStatus!=='waiting',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi – recept zařadí do 2 hodin.'))openRecipe(null)};
+  bindPicker('shp',id,()=>openRecipe(null));
   $('sh-del').onclick=async()=>{if(!$('sh-del').dataset.sure){$('sh-del').dataset.sure='1';$('sh-del').textContent='Opravdu smazat? Klepněte znovu';return}
     if(await write(()=>db.doc('recipes/'+id).delete(),'Recept smazán.'))openRecipe(null)};
   $('sh-edit').onclick=()=>{const box=$('sh-editbox');if(box.innerHTML){box.innerHTML='';return}
