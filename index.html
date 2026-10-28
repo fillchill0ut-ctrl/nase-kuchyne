@@ -635,7 +635,7 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.r
       const steps=$('se-steps').value.split('\n').map(l=>l.trim()).filter(Boolean);
       const patch={title:$('se-title').value.trim()||r.title,servings:parseInt($('se-serv').value,10)||r.servings||null,time:parseInt($('se-time').value,10)||r.time||null,ingredients:ing,steps,note:$('se-note').value.trim()};
       if(r.importStatus&&r.importStatus!=='ok'&&ing.length)patch.importStatus='manual';
-      if(await write(()=>db.doc('recipes/'+id).update(patch),'Recept uložen.'))renderSheet()}};
+      if(await write(()=>db.doc('recipes/'+id).update(patch),'Recept uložen.')){$('sh-editbox').innerHTML='';renderSheet()}}};
   if($('sh-photo'))$('sh-photo').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;toast('Nahrávám fotku…');
     try{const up=await assets.upload(f);await write(()=>db.doc('recipes/'+id).update({photo:up.id}),'Fotka uložena.')}catch(err){toast(err?.code==='too_large'?'Fotka je moc velká (max 20 MB).':'Fotku se nepodařilo nahrát.')}};
   if($('sh-nophoto'))$('sh-nophoto').onclick=()=>write(()=>db.doc('recipes/'+id).update({photo:null}));
