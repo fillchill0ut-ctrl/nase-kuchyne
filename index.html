@@ -812,6 +812,12 @@ function parseW(v){v=String(v||'').trim().replace(',','.');const m=v.match(/^(\d
   if(u==='kg'){n*=1000;u='g'}if(u==='l'){n*=1000;u='ml'}return {n:String(Math.round(n*10)/10),u}}
 function normW(v){if(v&&typeof v==='object')return v.n?v.n+' '+(v.u||'g'):'';const w=parseW(v);return w.n?w.n+' '+w.u:''}
 function pItem(x){/* old entries had one free-text qty */if(x.qty&&x.pcs==null&&x.weight==null){const t=String(x.qty).trim();if(/^\d+\s*(ks)?$/i.test(t))return {...x,pcs:t.replace(/\s*ks/i,''),weight:''};return {...x,pcs:'',weight:normW(t)}}return {pcs:'',weight:'',...x}}
+const PLACES=[['fridge','Lednice'],['freezer','Mrazák'],['pantry','Spíž']];
+function guessPlace(n){n=normName(n);
+  if(/mrazen|zmrzl|nanuk|mrazak/.test(n))return 'freezer';
+  if(/masl|mlek|jogurt|tvaroh|syr|smetan|vejc|mozzar|burrat|sunk|prosciut|salam|kure|maso|ryb|losos|salat|okurk|paprik|rajcat(?!.*konzerv)|mrkev|celer|porek|zazvor|citron|limet|avokad|brokol|spenat|hummus|pesto/.test(n)&&!/konzerv|krajena rajcata|passat|susen/.test(n))return 'fridge';
+  return 'pantry'}
+function placeOf(x){return x.place||guessPlace(x.name)}
 function renderPantry(){
   const ae=document.activeElement;if(ae&&$('dm-main').contains(ae)&&ae.matches('input,select'))return;
   const items=(pantryDoc().items||[]).map(pItem);const sug=PANTRY_SUG.filter(s=>!items.some(x=>normName(x.name)===normName(s)));
@@ -819,20 +825,25 @@ function renderPantry(){
   const unitSel=(u,attr)=>`<select ${attr} style="${f};width:46px;padding:2px;background:var(--surface)"><option value="g" ${u!=='ml'?'selected':''}>g</option><option value="ml" ${u==='ml'?'selected':''}>ml</option></select>`;
   const amount=(pcsAttr,pcs,wAttr,w,uAttr,label)=>`<input type="text" inputmode="numeric" ${pcsAttr} value="${esc(pcs)}" placeholder="–" aria-label="Počet kusů ${label}" style="${f};width:36px;text-align:right"><span style="font-size:13px;color:var(--muted);white-space:nowrap">ks ×</span><input type="text" inputmode="decimal" ${wAttr} value="${esc(w.n)}" placeholder="–" aria-label="Množství ${label}" style="${f};width:50px;text-align:right">${unitSel(w.u,uAttr)}`;
   const row='display:flex;align-items:center;gap:4px';
-  let h=`<div class="pcard">`+(items.map((x,i)=>{const w=parseW(x.weight);return `<div style="${row};padding:3px 4px 3px 12px;border-top:1px solid var(--line)"><input type="text" value="${esc(x.name)}" data-pname="${i}" aria-label="Potravina" style="flex:1;border:0;padding:4px 0;font-size:15px;font-weight:600;background:transparent;min-width:0">${amount(`data-ppcs="${i}"`,x.pcs||'',`data-pwn="${i}"`,w,`data-pwu="${i}"`,esc(x.name))}<button class="x" data-prm="${i}" aria-label="Smazat ${esc(x.name)}" style="width:28px;height:36px;border:0;background:none;color:var(--muted);font-size:18px;padding:0">×</button></div>`}).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co máte ve spíži a v lednici.</small></span></div>')+
-    `<form id="dm-add" style="${row};padding:8px 4px 8px 12px;border-top:1px solid var(--line)"><input type="text" id="dm-new" placeholder="Přidat…" aria-label="Přidat potravinu" style="flex:1;min-width:0;font-size:14px;height:30px;padding:4px 8px;border-radius:6px">${amount('id="dm-pcs"','','id="dm-wn"',{n:'',u:'g'},'id="dm-wu"','nové potraviny')}<button type="submit" aria-label="Přidat" style="width:28px;height:30px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-size:18px;padding:0">+</button></form></div>`;
-  h+=`<p class="sub" style="margin:0">Hmotnost je za 1 kus (balení), např. 3 ks × 500 g = 1,5 kg. Když kusy nevyplníte, je to hmotnost celkem.</p>`;
+  const menu=(i,pl,label)=>`<select data-pmenu="${i}" aria-label="Přesunout nebo smazat ${label}" style="width:28px;height:36px;border:0;background:none;color:var(--muted);font-size:18px;padding:0;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center"><option value="" selected>⋯</option>${PLACES.filter(([k])=>k!==pl).map(([k,n])=>`<option value="${k}">Přesunout: ${n}</option>`).join('')}<option value="del">Smazat</option></select>`;
+  let h='';
+  for(const [pl,title] of PLACES){
+    const rows=items.map((x,i)=>({x,i})).filter(o=>placeOf(o.x)===pl);
+    h+=`<div class="pg"><span class="eyebrow">${title}${rows.length?` (${rows.length})`:''}</span><div class="pcard">`+
+      rows.map(({x,i})=>{const w=parseW(x.weight);return `<div style="${row};padding:3px 4px 3px 12px;border-top:1px solid var(--line)"><input type="text" value="${esc(x.name)}" data-pname="${i}" aria-label="Potravina" style="flex:1;border:0;padding:4px 0;font-size:15px;font-weight:600;background:transparent;min-width:0">${amount(`data-ppcs="${i}"`,x.pcs||'',`data-pwn="${i}"`,w,`data-pwu="${i}"`,esc(x.name))}${menu(i,pl,esc(x.name))}</div>`}).join('')+
+      `<form class="dm-add" data-place="${pl}" style="${row};padding:8px 4px 8px 12px;${rows.length?'border-top:1px solid var(--line)':''}"><input type="text" data-new placeholder="Přidat do: ${title.toLowerCase()}…" aria-label="Přidat potravinu – ${title}" style="flex:1;min-width:0;font-size:14px;height:30px;padding:4px 8px;border-radius:6px">${amount('data-newpcs','','data-newwn',{n:'',u:'g'},'data-newwu','nové potraviny')}<button type="submit" aria-label="Přidat" style="width:28px;height:30px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-size:18px;padding:0">+</button></form></div></div>`}
+  h+=`<p class="sub" style="margin:0">Hmotnost je za 1 kus (balení), např. 3 ks × 500 g = 1,5 kg. Když kusy nevyplníte, je to hmotnost celkem. Přes ⋯ potravinu přesunete jinam nebo smažete.</p>`;
   if(sug.length)h+=`<div class="pg"><span class="eyebrow">Klepnutím přidáte</span><div class="tl">${sug.map(s=>`<button class="tc add" style="border-style:solid;color:var(--ink);font-weight:400" data-padd="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`;
   $('dm-main').innerHTML=h}
-function pList(){return (pantryDoc().items||[]).map(x=>{const y=pItem(x);delete y.qty;return y})}
+function pList(){return (pantryDoc().items||[]).map(x=>{const y=pItem(x);delete y.qty;if(!y.place)y.place=guessPlace(y.name);return y})}
 $('dm-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;const items=pList();
-  if(b.dataset.prm!=null){items.splice(+b.dataset.prm,1);await savePantry({items});return}
-  if(b.dataset.padd){items.push({id:uid(),name:b.dataset.padd,pcs:'',weight:''});await savePantry({items});return}});
-$('dm-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('dm-new').value.trim();if(!v)return;const items=pList();
-  const at=items.findIndex(x=>normName(x.name)===normName(v));const pcs=$('dm-pcs').value.trim(),w=normW({n:$('dm-wn').value.trim().replace(',','.'),u:$('dm-wu').value});
-  if(at>=0)items[at]={...items[at],pcs:pcs||items[at].pcs,weight:w||items[at].weight};else items.push({id:uid(),name:v,pcs,weight:w});
-  if(await savePantry({items},'Přidáno.')){renderPantry();$('dm-new')?.focus()}});
-$('dm-main').addEventListener('change',e=>{const t=e.target;const items=pList();
+  if(b.dataset.padd){items.push({id:uid(),name:b.dataset.padd,pcs:'',weight:'',place:guessPlace(b.dataset.padd)});await savePantry({items});return}});
+$('dm-main').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;const v=f.querySelector('[data-new]').value.trim();if(!v)return;const items=pList();const pl=f.dataset.place;
+  const at=items.findIndex(x=>normName(x.name)===normName(v));const pcs=f.querySelector('[data-newpcs]').value.trim(),w=normW({n:f.querySelector('[data-newwn]').value.trim().replace(',','.'),u:f.querySelector('[data-newwu]').value});
+  if(at>=0)items[at]={...items[at],pcs:pcs||items[at].pcs,weight:w||items[at].weight,place:pl};else items.push({id:uid(),name:v,pcs,weight:w,place:pl});
+  if(await savePantry({items},'Přidáno.')){renderPantry();$('dm-main').querySelector(`.dm-add[data-place="${pl}"] [data-new]`)?.focus()}});
+$('dm-main').addEventListener('change',async e=>{const t=e.target;const items=pList();
+  if(t.dataset.pmenu!=null){const i=+t.dataset.pmenu,v=t.value;t.blur();if(!v)return;if(v==='del')items.splice(i,1);else items[i].place=v;await savePantry({items},v==='del'?'Smazáno.':'Přesunuto.');renderPantry();return}
   if(t.dataset.pname!=null){const i=+t.dataset.pname,v=t.value.trim();if(!v){t.value=items[i].name;return}items[i].name=v;savePantry({items})}
   else if(t.dataset.ppcs!=null){items[+t.dataset.ppcs].pcs=t.value.trim();savePantry({items})}
   else if(t.dataset.pwn!=null||t.dataset.pwu!=null){const i=+(t.dataset.pwn??t.dataset.pwu);const row=t.parentElement;
