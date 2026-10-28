@@ -235,7 +235,6 @@ nav.tabs button{font-size:12px}
     <section id="v-nakup" hidden>
       <h2>Nákupní seznam</h2>
       <p class="sub" id="nak-sum">Načítám seznam…</p>
-      <button class="prow pcard" id="go-slevy" style="margin:8px 0 10px;border:1px solid var(--line)"><span class="t"><b>Slevy na hlídané potraviny</b><small id="go-slevy-sub">Co je teď v akci v našich obchodech</small></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       <div class="chips" id="nak-chips" role="group" aria-label="Filtr obchodu"></div>
       <div id="nak-list"></div>
       <div class="panel stack" style="margin-top:16px">
@@ -250,11 +249,7 @@ nav.tabs button{font-size:12px}
       </div>
     </section>
 
-    <section id="v-slevy" hidden>
-      <button class="link" id="sl-back" style="min-height:44px;font-size:16px;margin-top:6px">‹ Nákup</button>
-      <h2 style="margin-top:0">Slevy</h2>
-      <div id="sl-main" class="stack" style="gap:18px;margin-top:8px"></div>
-    </section>
+    
 
     <section id="v-doma" hidden>
       <h2>Doma</h2>
@@ -303,7 +298,7 @@ nav.tabs button{font-size:12px}
 </nav>
 
 <script>
-const VIEWS=['tyden','nakup','doma','recepty','profil','slevy'];
+const VIEWS=['tyden','nakup','doma','recepty','profil'];
 const CATS=['Maso a ryby','Zelenina a ovoce','Mléčné a vejce','Spíž','Pečivo','Ostatní'];
 let STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
 const SLOTN={lunch:'Oběd',dinner:'Večeře',dessert:'Moučník'};
@@ -782,59 +777,7 @@ $('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const f
   const ok=await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'replan',fromDate:from,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi. Změny uvidíte na kartě Týden.');
   if(ok){$('p-replan').hidden=true;show('tyden')}};
 
-/* ---------- deals watch: docs 'watch' = {list:[{id,name}], found:[{store,name,price,regular,until,match}], checkedAt, note} ---------- */
-const normName=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
-const kcNum=v=>{if(v==null||v==='')return null;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.').replace(/[^\d.]/g,''));return isNaN(n)?null:n};
-function guessCat(n){n=normName(n);
-  if(/maso|kur|vepr|hov|mlet|ryb|losos|tunak|plec|steh|prsa|slanin|prosciut|salsic|guanc|krut/.test(n))return 'Maso a ryby';
-  if(/syr|mlek|jogurt|tvaroh|vejc|masl|smetan|mozzar|burrat|parmaz|eidam|gran/.test(n))return 'Mléčné a vejce';
-  if(/chleb|rohl|bagel|peciv|kvask|toast/.test(n))return 'Pečivo';
-  if(/jabl|hrus|banan|citron|limet|pomer|avokad|rajc|paprik|okurk|mrkev|brambor|cibul|cesnek|dyn|zeli|salat|spenat|brokol|kvetak|zelenin|ovoc|hrozn|mandarin/.test(n))return 'Zelenina a ovoce';
-  if(/testovin|ryze|mouk|cukr|olej|cocka|fazol|konzerv|kava|caj|vlocky|bulgur|kuskus|orech/.test(n))return 'Spíž';
-  return 'Ostatní'}
-function onList(name,store){const k=normName(name);return S.items.some(i=>!i.checked&&normName(i.name)===k&&(i.store===store||!store))}
-function fmtChecked(t){if(!t)return '';const d=new Date(t);if(isNaN(d))return String(t);return d.getDate()+'. '+(d.getMonth()+1)+'. '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
-S.dealRows=[];
-function dealRow(f,i,hit){const inList=onList(f.name,f.store);const reg=kcNum(f.regular);const pr=kcNum(f.price);
-  return `<div class="drow"><div class="t"><b>${esc(f.name)}</b><small>${hit&&f.match?`<span class="hit">hlídáte: ${esc(f.match)}</span>`:''}${f.from&&f.from===f.until?'jen '+esc(f.from):(f.from?'od '+esc(f.from)+' ':'')+(f.until?'do '+esc(f.until):'')}</small></div>
-    <div class="tagp"><span class="p sale">${pr!=null?kc(pr):esc(f.price||'')}</span>${reg!=null&&reg>(pr||0)?`<s>${kc(reg)}</s>`:''}</div>
-    <button class="btn ${inList?'done':''}" data-addeal="${i}" ${inList?'disabled':''}>${inList?'Na seznamu ✓':'+ Na seznam'}</button></div>`}
-function renderDeals(){
-  const ae=document.activeElement;if(ae&&$('sl-main').contains(ae)&&ae.matches('input'))return;
-  const w=S.watch||(typeof MEM!=='undefined'&&MEM.docs.get('watch'))||{};const list=Array.isArray(w.list)?w.list:[];const found=Array.isArray(w.found)?w.found:[];
-  const waiting=(S.requests||[]).some(r=>r.type==='deals'&&r.status==='waiting');
-  const rows=[];S.dealRows=rows;
-  const stores=storeList().filter(s=>s!=='Kdekoli');
-  const hits={},other={};
-  found.forEach(f=>{(hits[f.store]=hits[f.store]||[]).push(f)});
-  const all=[...stores,...Object.keys(hits).filter(s=>!stores.includes(s))];
-  $('go-slevy-sub').textContent=found.length?`${found.length} ${found.length===1?'sleva':found.length<5?'slevy':'slev'} na potraviny, které hlídáte`:'Co je teď v akci v našich obchodech';
-  let h=`<p class="sub" style="margin:0">Hlídáme vybrané potraviny v obchodech z profilu. Letáky se kontrolují v pondělí a ve čtvrtek ráno.${w.checkedAt?` Naposledy: ${esc(fmtChecked(w.checkedAt))}.`:''}</p>`;
-  h+=waiting?`<div class="banner" style="margin:0"><b>Kontrola běží</b><span class="sub" style="color:var(--ink)">Claude prochází letáky, výsledky se tu objeví do 2 hodin.</span></div>`
-    :`<div class="row"><button class="btn" id="sl-check" style="min-height:40px">Zkontrolovat teď</button><button class="btn ghost" id="sl-goto" style="min-height:40px">Upravit, co hlídáme (${list.length})</button></div>`;
-  if(w.note)h+=`<p class="sub" style="margin:0">${esc(w.note)}</p>`;
-  const wl=`<div class="pg" id="sl-list"><span class="eyebrow">Co hlídáme (${list.length})</span><div class="pcard">${list.map((x,i)=>`<div class="srow"><input type="text" value="${esc(x.name)}" data-wname="${i}" aria-label="Hlídaná potravina"><button class="x" data-wrm="${i}" aria-label="Přestat hlídat ${esc(x.name)}">×</button></div>`).join('')||'<div class="prow"><span class="t"><small>Zatím nic. Přidejte, co kupujete pravidelně.</small></span></div>'}
-    <form class="addrow" id="sl-add" style="padding:10px 16px;border-top:1px solid var(--line)"><input type="text" id="sl-new" placeholder="Např. máslo, kuřecí stehna, káva" aria-label="Přidat potravinu"><button type="submit" aria-label="Přidat">+</button></form></div></div>`;
-  for(const s of all){const hs=hits[s]||[];
-    h+=`<div class="pg"><span class="eyebrow">${esc(s)}${hs.length?` · ${hs.length} v akci`:''}</span><div class="pcard">`;
-    h+=hs.length?hs.map(f=>{rows.push(f);return dealRow(f,rows.length-1,true)}).join(''):`<div class="prow"><span class="t"><small>${found.length||w.checkedAt?'Nic z hlídaných potravin teď v akci.':'Zatím nezkontrolováno.'}</small></span></div>`;
-    h+=`</div></div>`}
-  $('sl-main').innerHTML=h+wl}
-async function saveWatch(list,msg){return write(()=>db.doc('meta/watch').set({...(S.watch||MEM.docs.get('watch')||{}),list}),msg)}
-$('sl-main').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||(b.type==='submit'&&b.form))return;
-  if(b.id==='sl-goto'){$('sl-list').scrollIntoView({behavior:'smooth',block:'start'});return}
-  if(b.id==='sl-check'){const id='req-'+Date.now().toString(36);if(await write(()=>db.doc('meta/'+id).set({type:'deals',status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi.'))renderDeals();return}
-  if(b.dataset.wrm!=null){const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];l.splice(+b.dataset.wrm,1);await saveWatch(l);return}
-  if(b.dataset.addeal!=null){const f=S.dealRows[+b.dataset.addeal];if(!f)return;const pr=kcNum(f.price),reg=kcNum(f.regular);
-    await write(()=>db.collection('items').add({name:f.name,qty:'',store:f.store||'Kdekoli',cat:guessCat(f.name),price:pr,regular:reg,sale:true,checked:false,source:'manual',note:f.until?'Akce do '+f.until:'Akce',trip:1,order:Date.now()}),'Přidáno na seznam.');renderDeals()}});
-$('sl-main').addEventListener('submit',async e=>{e.preventDefault();const v=$('sl-new').value.trim();if(!v)return;const l=[...((S.watch||MEM.docs.get('watch'))?.list||[])];
-  if(l.some(x=>normName(x.name)===normName(v))){toast('Už hlídáme.');return}l.push({id:uid(),name:v});if(await saveWatch(l,'Přidáno – zkontroluje se při další kontrole.')){renderDeals();$('sl-new')?.focus()}});
-$('sl-main').addEventListener('change',e=>{const t=e.target;if(t.dataset.wname==null)return;const l=((S.watch||MEM.docs.get('watch'))?.list||[]).map(x=>({...x}));const i=+t.dataset.wname;const v=t.value.trim();
-  if(!v){t.value=l[i].name;return}l[i].name=v;saveWatch(l,'Uloženo.')});
-
-$('go-slevy').onclick=()=>{show('slevy');window.scrollTo(0,0)};
-$('sl-back').onclick=()=>show('nakup');
-
+const normName=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 /* ---------- pantry: docs 'pantry' = {items:[{id,name,qty}], done:["<date>:<slot>"]}.
    Plan meals may carry pantry:[{name, left}] – after that day has passed, items with no "left" are used up and removed, others get qty = left. ---------- */
 const PANTRY_SUG=['Cibule','Česnek','Brambory','Mrkev','Těstoviny','Rýže','Čočka','Fazole','Cizrna','Mouka','Cukr','Olivový olej','Máslo','Vejce','Krájená rajčata','Ovesné vločky','Kmín','Sladká paprika','Bobkový list'];
@@ -872,7 +815,7 @@ function render(){
   const p=S.plan;$('hdr').textContent=p?.weekLabel||'';
   const ns=storeList();if(ns.join()!==STORES.join()){const cur=$('add-store').value;STORES=ns;$('add-store').innerHTML=STORES.map(s=>`<option ${s===(STORES.includes(cur)?cur:'Kdekoli')?'selected':''}>${esc(s)}</option>`).join('')}
   if(S.view==='tyden')renderWeek();
-  renderShop();renderRecipes();renderProfile();renderDeals();renderPantry();
+  renderShop();renderRecipes();renderProfile();renderPantry();
   if(S.loaded?.plan)consumePantry();
   if(S.openRecipe)renderSheet();
   const rp=$('r-add').closest('.panel');rp.hidden=!sample;
