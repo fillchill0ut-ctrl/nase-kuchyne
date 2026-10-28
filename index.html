@@ -330,7 +330,6 @@ function renderWeek(){
   const open=S.items.filter(i=>!i.checked);
   const est=S.items.reduce((a,i)=>a+(Number(i.price)||0),0);
   let h=`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
-  if(p.summary)h+=`<p class="sub" style="max-width:60ch">${esc(p.summary)}</p>`;
   h+=`<div class="summary"><div class="stat"><b class="num">${kcRound(est)}</b><span>odhad nákupu z ${kcRound(p.budget?.limit||2000)}</span></div>
       <div class="stat"><b class="num">${open.length}</b><span>položek zbývá koupit</span></div></div>`;
   if(p.shops?.length){h+=`<div class="stack" style="margin-top:16px"><p class="eyebrow" style="margin:0">Kdy nakoupit</p>`;
@@ -812,7 +811,7 @@ $('dm-main').addEventListener('change',e=>{const t=e.target;const items=(pantryD
 
 /* ---------- render + data ---------- */
 function render(){
-  const p=S.plan;$('hdr').textContent=p?.weekLabel||'';
+  const p=S.plan;$('hdr').textContent='';
   const ns=storeList();if(ns.join()!==STORES.join()){const cur=$('add-store').value;STORES=ns;$('add-store').innerHTML=STORES.map(s=>`<option ${s===(STORES.includes(cur)?cur:'Kdekoli')?'selected':''}>${esc(s)}</option>`).join('')}
   if(S.view==='tyden')renderWeek();
   renderShop();renderRecipes();renderProfile();renderPantry();
