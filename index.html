@@ -374,7 +374,7 @@ function renderWeek(){
     if(dl.season?.length)h+=`<p class="sub" style="margin-bottom:0"><b>Sezóna teď:</b> ${esc(dl.season.join(', '))}</p>`;
     h+='</details>'}
   el.innerHTML=h;
-  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open,'week'));
   el.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.swap.split('|');S.swap={di:+di,slot,hint:'',busy:false,msg:''};renderWeek();$('swap-hint')?.focus()});
   if($('swap-hint')){$('swap-hint').oninput=e=>S.swap.hint=e.target.value;
     $('swap-hint').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();askSwap('own')}};
@@ -413,7 +413,7 @@ async function applyPick(di,slot,r,existingId){
   try{
     if(!existingId)await db.doc('recipes/'+id).set({...r,source:r.source||'Claude – výměna jídla',createdAt:new Date().toISOString()});
     await db.doc('meta/plan').update({days});
-    toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id);return true;
+    toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id,'week');return true;
   }catch(e){toast('Uložení se nepovedlo. Zkuste to znovu.');return false}
 }
 
@@ -558,19 +558,20 @@ function impLine(r){const st=IMPS[r.importStatus];if(!st||r.importStatus==='ok'|
 function renderRecipes(){
   if(S.view!=='recepty')return;
   const q=S.q.toLowerCase();
-  let rs=[...S.recipes.entries()].map(([id,r])=>({id,...r}));
+  let rs=[...S.recipes.entries()].map(([id,r])=>({id,...RV(r)}));
   const RF=['Vše','Uložené','Oblíbené','Chutnalo','Nechutnalo'];
   $('r-chips').innerHTML=RF.map(f=>`<button class="chip" aria-pressed="${f===S.rf}" data-rf="${f}">${f}</button>`).join('');
   $('r-chips').querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{S.rf=b.dataset.rf;renderRecipes()});
   if(S.rf==='Uložené')rs=rs.filter(r=>r.saved);else if(S.rf==='Oblíbené')rs=rs.filter(r=>r.fav);else if(S.rf==='Chutnalo')rs=rs.filter(r=>r.rating==='up');else if(S.rf==='Nechutnalo')rs=rs.filter(r=>r.rating==='down');
   if(q)rs=rs.filter(r=>(r.title+' '+(r.tags||[]).join(' ')+' '+(r.ingredients||[]).map(i=>i.name).join(' ')).toLowerCase().includes(q));
   rs.sort((a,b)=>(b.importStatus==='waiting'||b.importStatus==='failed'?1:0)-(a.importStatus==='waiting'||a.importStatus==='failed'?1:0)||(b.fav?1:0)-(a.fav?1:0)||String(a.title).localeCompare(b.title,'cs'));
+  $('imp-form').hidden=S.rf!=='Uložené';
   const el=$('r-list');
   if(!S.loaded.recipes){el.innerHTML='<p class="sub">Načítám recepty…</p>';return}
-  if(!rs.length){el.innerHTML=`<div class="empty">${q?'Nic takového tu není.':'Zatím žádné recepty. Přibudou s prvním plánem, nebo vložte vlastní níže.'}</div>`;return}
+  if(!rs.length){el.innerHTML=`<div class="empty">${q?'Nic takového tu není.':(S.rf==='Uložené'?'Zatím žádné uložené recepty. Vložte odkaz níže.':S.rf==='Oblíbené'?'Zatím žádné oblíbené. Recept oblíbíte hvězdičkou v jeho detailu.':'Zatím žádné recepty.')}</div>`;return}
   el.innerHTML=rs.map(r=>`<div class="stack" style="gap:6px"><button class="rcard" data-open="${esc(r.id)}"><span class="thumb">${pic(r,r.id)}</span><span style="min-width:0"><h3>${r.fav?'★ ':''}${esc(r.title)}</h3>
     <div class="sub num" style="margin-bottom:6px">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}${r.rating==='up'?' · chutnalo':r.rating==='down'?' · nechutnalo':''}</div>
-    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>${r.saved&&r.importStatus!=='waiting'?`<div class="row" style="gap:8px"><button class="btn" data-addweek="${esc(r.id)}" style="padding:6px 12px">+ Přidat do týdne</button></div><div data-pick="${esc(r.id)}"></div>`:''}</div>`).join('');
+    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>${(r.saved||r.fav)&&r.importStatus!=='waiting'?`<div class="row" style="gap:8px"><button class="btn" data-addweek="${esc(r.id)}" style="padding:6px 12px">+ Přidat do týdne</button></div><div data-pick="${esc(r.id)}"></div>`:''}</div>`).join('');
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
   el.querySelectorAll('[data-addweek]').forEach(b=>b.onclick=()=>{const id=b.dataset.addweek,box=el.querySelector(`[data-pick="${CSS.escape(id)}"]`);
     if(box.innerHTML){box.innerHTML='';return}box.innerHTML=pickerHTML('pk-'+id);bindPicker('pk-'+id,id,()=>{box.innerHTML=''})});
@@ -592,16 +593,24 @@ $('imp-form').onsubmit=async e=>{e.preventDefault();const url=$('imp-url').value
   if(!ok)return;
   await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url,note:$('imp-note').value.trim(),plan,status:'waiting',createdAt:now}),'Uloženo. Claude recept načte do 2 hodin.');
   $('imp-url').value='';$('imp-note').value=''};
-function openRecipe(id){S.openRecipe=id||null;renderSheet()}
-function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.recipes.get(id);
-  if(r&&!sh.hidden&&sh.dataset.rid===id&&$('sh-editbox')?.innerHTML)return; sh.dataset.rid=id||'';
-  if(!r){sh.hidden=true;document.body.style.overflow='';return}
+/* favourites get a general version (r.general) written by Claude; the week keeps its week-specific version */
+function RV(r){return r&&r.general?{...r,...r.general}:r}
+function openRecipe(id,ctx){S.openRecipe=id||null;S.recipeCtx=ctx||'lib';S.recipeAlt=false;renderSheet()}
+function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.recipes.get(id);
+  if(r0&&!sh.hidden&&sh.dataset.rid===id&&($('sh-editbox')?.innerHTML||document.activeElement?.id==='sh-mynote'))return; sh.dataset.rid=id||'';
+  if(!r0){sh.hidden=true;document.body.style.overflow='';return}
+  const weekVer=!!r0.general&&S.recipeCtx==='week'&&S.plan?.weekStart===r0.general.fromWeek;
+  const showGen=!!r0.general&&(weekVer?S.recipeAlt:!S.recipeAlt);
+  const r=showGen?RV(r0):r0;
+  const genPending=r0.fav&&!r0.general&&!r0.saved;
   const src=r.source&&/^https?:\/\//.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</a>`:esc(r.source||'');
   sh.innerHTML=`<div class="wrap stack"><div class="row" style="justify-content:space-between"><button class="btn" id="sh-x">← Zpět</button>
       <button class="btn${r.fav?' primary':''}" id="sh-fav" aria-pressed="${!!r.fav}">${r.fav?'★ Oblíbené':'☆ Oblíbit'}</button></div>
     <div class="hero">${pic(r,id)}</div>
     ${assets?`<div class="row" style="justify-content:center"><label class="btn" for="sh-photo">${r.photo?'Vyměnit fotku':'Přidat vlastní fotku'}</label><input type="file" id="sh-photo" accept="image/jpeg,image/png,image/webp" hidden>${r.photo?'<button class="btn ghost" id="sh-nophoto">Zpět na ilustraci</button>':''}</div>`:''}
-    ${r.importStatus?(()=>{const st=IMPS[r.importStatus]||IMPS.ok;return `<div style="background:${st[1]};color:${st[2]};border-radius:var(--r);padding:10px 14px"><b>${st[0]}</b>${r.importNote?`<div style="margin-top:4px">${esc(r.importNote)}</div>`:''}${r.userNote?`<div class="sub" style="margin-top:4px;color:inherit">Vaše poznámka: ${esc(r.userNote)}</div>`:''}</div>`})():''}
+    ${r.importStatus?(()=>{const st=IMPS[r.importStatus]||IMPS.ok;return `<div style="background:${st[1]};color:${st[2]};border-radius:var(--r);padding:10px 14px"><b>${st[0]}</b>${r.importNote?`<div style="margin-top:4px">${esc(r.importNote)}</div>`:''}</div>`})():''}
+    ${genPending?'<div style="background:#fff6cf;color:#5a4a00;border-radius:var(--r);padding:10px 14px"><b>Claude připravuje obecnou verzi receptu</b><div style="margin-top:4px">Bez vazby na tento týden (co bylo doma, akce, množství) – do 2 hodin.</div></div>':''}
+    ${r0.general?`<div class="row" style="gap:8px;align-items:center"><span class="sub">${showGen?'Obecný recept':'Verze pro tento týden'}</span><button class="btn ghost" id="sh-alt" style="padding:4px 10px">${showGen?(weekVer?'Zpět na tento týden':'Zobrazit verzi z týdne'):'Zobrazit obecný recept'}</button></div>`:''}
     <div><h2 id="sheet-title" style="margin-top:6px">${esc(r.title)}</h2>
       <div class="sub num">${r.time?r.time+' min celkem':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}</div></div>
     ${r.note?`<p style="margin:0;max-width:60ch">${esc(r.note)}</p>`:''}
@@ -611,12 +620,15 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.r
     ${r.sourceUrl?`<a class="panel" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:var(--ink)"><span class="eyebrow">Recept na webu</span><br><b>${esc(r.sourceLabel||r.sourceUrl.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</b> ↗</a>`:''}
     <h3>Postup</h3><ol>${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
     ${r.importStatus==='waiting'?'':`<div class="stack" style="gap:8px"><h3>Přidat do týdne</h3>${pickerHTML('shp')}</div>`}
+    <div class="stack" style="gap:6px"><h3>Naše poznámky</h3><textarea id="sh-mynote" placeholder="Např. příště víc česneku, malý jí bez omáčky…" style="min-height:70px">${esc(r0.userNote||'')}</textarea><span class="sub" id="sh-mynote-st">Ukládá se samo. Claude poznámky čte při plánování.</span></div>
     <div class="row"><button class="btn" id="sh-edit">Upravit recept</button><button class="btn" id="sh-del" style="color:#a1331a">Smazat recept</button></div>
     <div id="sh-editbox"></div>
     <h3>Jak chutnalo?</h3><div class="row"><button class="btn rate" data-rate="up" aria-pressed="${r.rating==='up'}">Chutnalo</button><button class="btn rate" data-rate="down" aria-pressed="${r.rating==='down'}">Nechutnalo</button></div>
     <p class="sub">Oblíbené a hodnocení se ukládají pro vás oba a Claude podle nich skládá další plány: oblíbená jídla občas zopakuje, podobná přidá a těm, co nechutnala, se vyhne.${src?' Zdroj: '+src:''}</p></div>`;
   sh.hidden=false;document.body.style.overflow='hidden';
   $('sh-x').onclick=()=>openRecipe(null);
+  if($('sh-alt'))$('sh-alt').onclick=()=>{S.recipeAlt=!S.recipeAlt;renderSheet()};
+  $('sh-mynote').onchange=async e=>{const v=e.target.value.trim();if(v===(r0.userNote||''))return;if(await write(()=>db.doc('recipes/'+id).update({userNote:v})))$('sh-mynote-st').textContent='Uloženo.'};
   bindPicker('shp',id,()=>openRecipe(null));
   $('sh-del').onclick=async()=>{if(!$('sh-del').dataset.sure){$('sh-del').dataset.sure='1';$('sh-del').textContent='Opravdu smazat? Klepněte znovu';return}
     if(await write(()=>db.doc('recipes/'+id).delete(),'Recept smazán.'))openRecipe(null)};
@@ -632,12 +644,14 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r=id&&S.r
       const ing=$('se-ing').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [n,...q]=l.split('|');return {name:n.trim(),qty:q.join('|').trim()}});
       const steps=$('se-steps').value.split('\n').map(l=>l.trim()).filter(Boolean);
       const patch={title:$('se-title').value.trim()||r.title,servings:parseInt($('se-serv').value,10)||r.servings||null,time:parseInt($('se-time').value,10)||r.time||null,ingredients:ing,steps,note:$('se-note').value.trim()};
-      if(r.importStatus&&r.importStatus!=='ok'&&ing.length)patch.importStatus='manual';
-      if(await write(()=>db.doc('recipes/'+id).update(patch),'Recept uložen.')){$('sh-editbox').innerHTML='';renderSheet()}}};
+      if(!showGen&&r.importStatus&&r.importStatus!=='ok'&&ing.length)patch.importStatus='manual';
+      const upd=showGen?{general:{...r0.general,...patch}}:patch;
+      if(await write(()=>db.doc('recipes/'+id).update(upd),'Recept uložen.')){$('sh-editbox').innerHTML='';renderSheet()}}};
   if($('sh-photo'))$('sh-photo').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;toast('Nahrávám fotku…');
     try{const up=await assets.upload(f);await write(()=>db.doc('recipes/'+id).update({photo:up.id}),'Fotka uložena.')}catch(err){toast(err?.code==='too_large'?'Fotka je moc velká (max 20 MB).':'Fotku se nepodařilo nahrát.')}};
   if($('sh-nophoto'))$('sh-nophoto').onclick=()=>write(()=>db.doc('recipes/'+id).update({photo:null}));
-  $('sh-fav').onclick=()=>write(()=>db.doc('recipes/'+id).update({fav:!r.fav}));
+  $('sh-fav').onclick=async()=>{const on=!r0.fav;if(!await write(()=>db.doc('recipes/'+id).update({fav:on})))return;
+    if(on&&!r0.general&&!r0.saved)await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'generalize',recipeId:id,weekStart:S.plan?.weekStart||'',status:'waiting',createdAt:new Date().toISOString()}),'Přidáno do oblíbených. Claude připraví obecnou verzi receptu – do 2 hodin.')};
   sh.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>write(()=>db.doc('recipes/'+id).update({rating:r.rating===b.dataset.rate?null:b.dataset.rate})));
   $('sh-add').onclick=async()=>{const base=Date.now();let n=0;for(const i of r.ingredients||[]){const ok=await write(()=>db.collection('items').add({name:i.name,qty:i.qty,store:'Kdekoli',cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',note:r.title,trip:1,order:base+n}));if(!ok)return;n++}toast(`Přidáno ${n} surovin na seznam.`)};
 }
