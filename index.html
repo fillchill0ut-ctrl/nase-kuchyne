@@ -335,7 +335,7 @@ const VTITLE={tyden:'Týden',nakup:'Nákup',doma:'Doma',recepty:'Recepty',profil
 function plural(n,a,b,c){return n===1?a:(n>=2&&n<=4?b:c)}
 function setHeader(){const v=S.view||'tyden';if(!$('vt'))return;$('vt').textContent=VTITLE[v]||'';let r='';
   if(v==='tyden')r=(WP().p?.weekLabel||'').replace(/^Týden\s*/,'');
-  else if(v==='nakup'){const n=(S.items||[]).filter(i=>!i.checked).length;r=n?`${n} ${plural(n,'položka','položky','položek')}`:''}
+  else if(v==='nakup'){const n=(S.items||[]).filter(i=>!i.checked&&!i.skipped).length;r=n?`${n} ${plural(n,'položka','položky','položek')}`:''}
   else if(v==='doma'){const n=(pantryDoc().items||[]).length;r=n?`${n} ${plural(n,'potravina','potraviny','potravin')}`:''}
   else if(v==='recepty'){const n=S.recipes?.size||0;r=n?`${n} ${plural(n,'recept','recepty','receptů')}`:''}
   $('hdr').textContent=r}
@@ -354,7 +354,7 @@ function renderWeek(){
   if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
   if(!p){el.innerHTML=seg+`<div class="empty">${W.w==='next'?'Plán na příští týden ještě není. Claude ho připravuje vždy v pátek odpoledne, až vyjdou nové letáky – i s nákupem na víkend.':'Plán na tento týden ještě není.'}</div>`;bindSeg();return}
   const today=todayISO();
-  const wItems=S.items.filter(i=>itemWeek(i)===W.w);
+  const wItems=S.items.filter(i=>itemWeek(i)===W.w&&!i.skipped);
   const open=wItems.filter(i=>!i.checked);
   const est=wItems.reduce((a,i)=>a+(Number(i.price)||0),0);
   let h=seg?seg:`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
@@ -370,12 +370,16 @@ function renderWeek(){
     h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3></div>`;    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
       const sw=S.swap&&S.swap.pid===W.pid&&S.swap.di===di&&S.swap.slot===slot;
       const rr=has?S.recipes.get(m.recipeId):null;
+      if(m.skip){h+=`<div class="meal" style="opacity:.6"><span class="thumb" aria-hidden="true"></span><div><span class="slot">${SLOTN[slot]}</span> <span class="leftover" style="background:#eceae4;color:var(--muted)">Nevaříme</span>
+        <div class="mtitle" style="text-decoration:line-through">${esc(m.title||'—')}</div>
+        <div class="mnote">Suroviny jsou mimo nákup a z Doma se neodeberou.</div>
+        <div class="row" style="margin-top:4px;gap:14px"><button class="link" data-unskip="${di}|${slot}">Přece uděláme</button><button class="link" data-swap="${di}|${slot}">Vybrat jiné jídlo</button></div>${sw?swapBox():''}</div></div>`;return}
       h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
         ${m.leftover?'<span class="leftover">Zbytek</span>':''}
         <button class="mtitle${has?' has':''}" data-open="${esc(m.recipeId||'')}" ${has?'':'disabled'}>${esc(m.title||'—')}</button>
         ${m.note?`<div class="mnote">${esc(m.note)}</div>`:''}
         ${rr?.sourceUrl?`<div style="margin-top:3px"><a class="link" href="${esc(rr.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a></div>`:''}
-        ${!sw&&!reqFor(d.date,slot)?`<div class="row" style="margin-top:4px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button></div>`:''}
+        ${!sw&&!reqFor(d.date,slot)?`<div class="row" style="margin-top:4px;gap:14px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button>${has||m.leftover?`<button class="link" data-skip="${di}|${slot}" style="color:var(--muted)">Nebudeme dělat</button>`:''}</div>`:''}
         ${sw?swapBox():reqBox(d.date,slot)}
       </div></div>`});
     h+='</article>'});
@@ -396,11 +400,24 @@ function renderWeek(){
     $('swap-lib').onclick=()=>{S.swap.lib=!S.swap.lib;renderWeek()};
     el.querySelectorAll('[data-picklib]').forEach(b=>b.onclick=()=>pickLib(b.dataset.picklib));
     el.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>pickSwap(+b.dataset.pick))}
+  el.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.skip.split('|');setSkip(W.pid,+di,slot,true)});
+  el.querySelectorAll('[data-unskip]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.unskip.split('|');setSkip(W.pid,+di,slot,false)});
   el.querySelectorAll('[data-reqcancel]').forEach(b=>b.onclick=()=>write(()=>db.doc('meta/'+b.dataset.reqcancel).delete(),'Žádost zrušena.'));
   el.querySelectorAll('[data-reqpick]').forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.reqpick.split('|');pickReq(id,+i)});
 }
 /* swap requests handled by Claude on the Pro plan (until the API is switched on) */
-function reqFor(date,slot){return (S.requests||[]).find(r=>r.date===date&&r.slot===slot&&r.status!=='done')}
+function reqFor(date,slot){return (S.requests||[]).find(r=>r.type!=='skip'&&r.date===date&&r.slot===slot&&r.status!=='done')}
+/* "Nebudeme dělat": meal.skip – its ingredients leave the shopping list (items tagged with meals:["date:slot"]) and Doma is not reduced.
+   A leftover lunch made from that dinner is skipped too. Claude then fixes shared or untagged items (request type 'skip'). */
+function skippedSet(){const s=new Set();for(const p of [S.plan,S.planNext])(p?.days||[]).forEach(d=>['lunch','dinner','dessert'].forEach(sl=>{if(d[sl]?.skip)s.add(d.date+':'+sl)}));return s}
+async function setSkip(pid,di,slot,on){const p=planOf(pid);if(!p)return;const days=JSON.parse(JSON.stringify(p.days));const d=days[di];const m=d[slot];if(!m)return;
+  if(on)m.skip=true;else delete m.skip;let alsoLunch=false;
+  const nx=days[di+1];if(slot==='dinner'&&nx?.lunch?.leftover&&m.recipeId&&nx.lunch.recipeId===m.recipeId){if(on)nx.lunch.skip=true;else delete nx.lunch.skip;alsoLunch=true}
+  if(!await write(()=>db.doc('meta/'+pid).update({days})))return;S.swap=null;
+  const sk=skippedSet();
+  for(const i of S.items){if(i.checked||!Array.isArray(i.meals)||!i.meals.length)continue;const all=i.meals.every(k=>sk.has(k));if(all!==!!i.skipped)await write(()=>db.doc('items/'+i.id).update({skipped:all}))}
+  await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'skip',pid,date:d.date,slot,alsoLunch,undo:!on,status:'waiting',createdAt:new Date().toISOString()}));
+  toast(on?(alsoLunch?'Nevaříme – i zítřejší oběd ze zbytků odpadá. Nákup se upraví.':'Nevaříme – suroviny jdou z nákupu pryč.'):'Vrátili jsme jídlo do plánu i na nákup.')}
 function optCard(r,key,attr){return `<div class="opt"><span class="thumb">${dish(r.look,key)}</span><div style="min-width:0"><h3>${esc(r.title)}</h3>
     <div class="sub num">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active:''}${r.servings?' · '+r.servings+' porce':''}${r.batch?' · i na oběd další den':''}</div>
     ${r.note?`<div class="mnote">${esc(r.note)}</div>`:''}<div class="row" style="margin-top:6px"><button class="btn primary" ${attr}>Vybrat</button>${r.sourceUrl?`<a class="link" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a>`:`<a class="link" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Jak to vypadá ↗</a>`}</div></div></div>`}
@@ -520,7 +537,7 @@ function dish(look,key){const L=cleanLook(look)||{vessel:'plate',base:'#d9b779',
 /* ---------- shopping ---------- */
 function sortItems(a,b){return (itemWeek(a)==='next'?1:0)-(itemWeek(b)==='next'?1:0)||(a.trip||1)-(b.trip||1)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||CATS.indexOf(a.cat)-CATS.indexOf(b.cat)||(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,'cs')}
 function renderShop(){
-  const all=S.items;const open=all.filter(i=>!i.checked);
+  const all=S.items.filter(i=>!i.skipped);const open=all.filter(i=>!i.checked);
   $('badge').textContent=open.length?`(${open.length})`:'';
   if(S.view!=='nakup')return;
   const sumOpen=open.reduce((a,i)=>a+(Number(i.price)||0),0);
@@ -863,7 +880,7 @@ let pantryBusy=false;
 async function consumePantry(){
   if(pantryBusy||!db||!(S.plan?.days||S.planNext?.days))return;const pd=pantryDoc();const items=(pd.items||[]).map(x=>({...x}));const done=new Set(pd.done||[]);const today=todayISO();let changed=false;
   for(const d of [...(S.plan?.days||[]),...(S.planNext?.days||[])]){if(d.date>=today)continue;
-    for(const slot of ['lunch','dinner','dessert']){const m=d[slot];if(!m||!Array.isArray(m.pantry)||!m.pantry.length)continue;const key=d.date+':'+slot;if(done.has(key))continue;
+    for(const slot of ['lunch','dinner','dessert']){const m=d[slot];if(!m||m.skip||!Array.isArray(m.pantry)||!m.pantry.length)continue;const key=d.date+':'+slot;if(done.has(key))continue;
       done.add(key);changed=true;
       for(const u of m.pantry){const k=normName(u.name);const i=items.findIndex(x=>normName(x.name)===k);const j=i>=0?i:items.findIndex(x=>normName(x.name).includes(k)||k.includes(normName(x.name)));
         if(j<0)continue;const L=u.left;
