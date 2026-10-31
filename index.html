@@ -323,8 +323,8 @@ function pickPlans(docs){const t=todayISO();const L=[['plan',docs.get('plan')],[
   const cur=U.filter(([,p])=>p.weekStart<=t).sort((a,b)=>b[1].weekStart.localeCompare(a[1].weekStart))[0];
   const nxt=U.filter(([,p])=>p.weekStart>t).sort((a,b)=>a[1].weekStart.localeCompare(b[1].weekStart))[0];
   S.plan=cur?cur[1]:null;S.planId=cur?cur[0]:'plan';S.planNext=nxt?nxt[1]:null;S.planNextId=nxt?nxt[0]:'plan-next';
-  if(!S.planNext&&S.wk==='next')S.wk='this'}
-function WP(w){w=w||S.wk;return w==='next'&&S.planNext?{p:S.planNext,pid:S.planNextId,w:'next'}:{p:S.plan,pid:S.planId,w:'this'}}
+}
+function WP(w){w=w||S.wk;return w==='next'?{p:S.planNext,pid:S.planNextId,w:'next'}:{p:S.plan,pid:S.planId,w:'this'}}
 function planOf(id){return id===S.planNextId&&S.planNext?S.planNext:S.plan}
 function planForDate(date){for(const [p,pid] of [[S.plan,S.planId],[S.planNext,S.planNextId]])if(p?.days?.some(d=>d.date===date))return {p,pid};return null}
 function itemWeek(i){return S.planNext&&i.weekStart&&i.weekStart===S.planNext.weekStart?'next':'this'}
@@ -349,10 +349,10 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>show(b.dat
 /* ---------- week ---------- */
 function renderWeek(){
   const el=$('v-tyden');const W=WP();const p=W.p;
-  const seg=S.planNext?`<div class="seg wide" role="group" aria-label="Týden" style="margin-bottom:14px"><button type="button" data-wk="this" aria-pressed="${W.w==='this'}">Tento týden</button><button type="button" data-wk="next" aria-pressed="${W.w==='next'}">Příští týden</button></div>`:'';
+  const seg=`<div class="seg wide" role="group" aria-label="Týden" style="margin-bottom:14px"><button type="button" data-wk="this" aria-pressed="${W.w==='this'}">Tento týden</button><button type="button" data-wk="next" aria-pressed="${W.w==='next'}">Příští týden</button></div>`;
   const bindSeg=()=>el.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{S.wk=b.dataset.wk;S.swap=null;try{localStorage.setItem('nk-wk',S.wk)}catch(e){}renderWeek();setHeader();window.scrollTo(0,0)});
   if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
-  if(!p){el.innerHTML=seg+'<h2>Tento týden</h2><div class="empty">Plán na tento týden ještě není. Claude připravuje plán na další týden vždy v pátek, až vyjdou nové letáky.</div>';bindSeg();return}
+  if(!p){el.innerHTML=seg+`<div class="empty">${W.w==='next'?'Plán na příští týden ještě není. Claude ho připravuje vždy v pátek odpoledne, až vyjdou nové letáky – i s nákupem na víkend.':'Plán na tento týden ještě není.'}</div>`;bindSeg();return}
   const today=todayISO();
   const wItems=S.items.filter(i=>itemWeek(i)===W.w);
   const open=wItems.filter(i=>!i.checked);
