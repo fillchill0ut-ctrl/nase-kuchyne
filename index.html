@@ -310,20 +310,31 @@ let STORES=['Kaufland','Albert','Billa','Lidl','Rohlík','Kdekoli'];
 const SLOTN={lunch:'Oběd',dinner:'Večeře',dessert:'Moučník'};
 const DAYN=['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota'];
 const S={items:[],recipes:new Map(),plan:null,profile:null,deals:null,loaded:{items:false,plan:false,recipes:false},
-  view:'tyden',filter:'Vše',rf:'Vše',editing:null,openRecipe:null,swap:null,q:''};
+  view:'tyden',filter:'Vše',rf:'Vše',editing:null,openRecipe:null,swap:null,q:'',wk:(()=>{try{return localStorage.getItem('nk-wk')==='next'?'next':'this'}catch(e){return 'this'}})(),planNext:null,planId:'plan',planNextId:'plan-next'};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const kc=n=>n==null||n===''?'':Number(n).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' Kč';
 const kcRound=n=>Math.round(n).toLocaleString('cs-CZ')+' Kč';
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2600)}
 function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+/* two plan docs: 'plan' and 'plan-next' – which one is this week is decided by weekStart, so Monday works even before Claude moves the docs */
+function pickPlans(docs){const t=todayISO();const L=[['plan',docs.get('plan')],['plan-next',docs.get('plan-next')]].filter(([,p])=>p&&p.weekStart&&Array.isArray(p.days));
+  const seen=new Set();const U=L.filter(([,p])=>!seen.has(p.weekStart)&&seen.add(p.weekStart));
+  const cur=U.filter(([,p])=>p.weekStart<=t).sort((a,b)=>b[1].weekStart.localeCompare(a[1].weekStart))[0];
+  const nxt=U.filter(([,p])=>p.weekStart>t).sort((a,b)=>a[1].weekStart.localeCompare(b[1].weekStart))[0];
+  S.plan=cur?cur[1]:null;S.planId=cur?cur[0]:'plan';S.planNext=nxt?nxt[1]:null;S.planNextId=nxt?nxt[0]:'plan-next';
+  if(!S.planNext&&S.wk==='next')S.wk='this'}
+function WP(w){w=w||S.wk;return w==='next'&&S.planNext?{p:S.planNext,pid:S.planNextId,w:'next'}:{p:S.plan,pid:S.planId,w:'this'}}
+function planOf(id){return id===S.planNextId&&S.planNext?S.planNext:S.plan}
+function planForDate(date){for(const [p,pid] of [[S.plan,S.planId],[S.planNext,S.planNextId]])if(p?.days?.some(d=>d.date===date))return {p,pid};return null}
+function itemWeek(i){return S.planNext&&i.weekStart&&i.weekStart===S.planNext.weekStart?'next':'this'}
 function dateLabel(iso){const [y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d);return {name:DAYN[dt.getDay()],short:d+'. '+m+'.'}}
 
 /* ---------- navigation ---------- */
 const VTITLE={tyden:'Týden',nakup:'Nákup',doma:'Doma',recepty:'Recepty',profil:'Profil'};
 function plural(n,a,b,c){return n===1?a:(n>=2&&n<=4?b:c)}
 function setHeader(){const v=S.view||'tyden';if(!$('vt'))return;$('vt').textContent=VTITLE[v]||'';let r='';
-  if(v==='tyden')r=(S.plan?.weekLabel||'').replace(/^Týden\s*/,'');
+  if(v==='tyden')r=(WP().p?.weekLabel||'').replace(/^Týden\s*/,'');
   else if(v==='nakup'){const n=(S.items||[]).filter(i=>!i.checked).length;r=n?`${n} ${plural(n,'položka','položky','položek')}`:''}
   else if(v==='doma'){const n=(pantryDoc().items||[]).length;r=n?`${n} ${plural(n,'potravina','potraviny','potravin')}`:''}
   else if(v==='recepty'){const n=S.recipes?.size||0;r=n?`${n} ${plural(n,'recept','recepty','receptů')}`:''}
@@ -337,24 +348,27 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>show(b.dat
 
 /* ---------- week ---------- */
 function renderWeek(){
-  const el=$('v-tyden');const p=S.plan;
+  const el=$('v-tyden');const W=WP();const p=W.p;
+  const seg=S.planNext?`<div class="seg wide" role="group" aria-label="Týden" style="margin-bottom:14px"><button type="button" data-wk="this" aria-pressed="${W.w==='this'}">Tento týden</button><button type="button" data-wk="next" aria-pressed="${W.w==='next'}">Příští týden</button></div>`:'';
+  const bindSeg=()=>el.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{S.wk=b.dataset.wk;S.swap=null;try{localStorage.setItem('nk-wk',S.wk)}catch(e){}renderWeek();setHeader();window.scrollTo(0,0)});
   if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
-  if(!p){el.innerHTML='<h2>Tento týden</h2><div class="empty">Plán na tento týden ještě není. Claude ho připraví po vydání nových letáků a objeví se tady i s nákupním seznamem.</div>';return}
+  if(!p){el.innerHTML=seg+'<h2>Tento týden</h2><div class="empty">Plán na tento týden ještě není. Claude připravuje plán na další týden vždy v pátek, až vyjdou nové letáky.</div>';bindSeg();return}
   const today=todayISO();
-  const open=S.items.filter(i=>!i.checked);
-  const est=S.items.reduce((a,i)=>a+(Number(i.price)||0),0);
-  let h=`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
+  const wItems=S.items.filter(i=>itemWeek(i)===W.w);
+  const open=wItems.filter(i=>!i.checked);
+  const est=wItems.reduce((a,i)=>a+(Number(i.price)||0),0);
+  let h=seg?seg:`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
   h+=`<div class="summary"><div class="stat"><b class="num">${kcRound(est)}</b><span>odhad nákupu z ${kcRound(p.budget?.limit||2000)}</span></div>
       <div class="stat"><b class="num">${open.length}</b><span>položek zbývá koupit</span></div></div>`;
   if(p.shops?.length){h+=`<div class="stack" style="margin-top:16px"><p class="eyebrow" style="margin:0">Kdy nakoupit</p>`;
     p.shops.forEach(s=>{h+=`<div class="shop"><h3>${esc(s.title)} · ${esc(s.when)}</h3><div class="sub">${esc(s.stores||'')}</div>${s.note?`<div class="mnote">${esc(s.note)}</div>`:''}</div>`});h+='</div>'}
-  const rp=(S.requests||[]).find(r=>r.type==='replan');
+  const rp=W.w==='this'?(S.requests||[]).find(r=>r.type==='replan'):null;
   if(rp){h+=`<div class="banner">${rp.status==='done'?`<b>Zbytek týdne je upravený podle nových pravidel</b>${rp.message?`<span>${esc(rp.message)}</span>`:''}`:rp.status==='error'?`<b>Přeplánování se nepovedlo</b><span>${esc(rp.message||'')}</span>`:`<b>Čeká na přeplánování zbytku týdne</b><span class="sub" style="color:var(--ink)">Claude upraví zbývající dny a nákupní seznam podle nových pravidel, obvykle do 2 hodin.</span>`}
     <div class="row"><button class="btn ghost" data-reqcancel="${esc(rp.id)}">${rp.status==='waiting'?'Zrušit':'Zavřít'}</button></div></div>`}
   h+=`<div class="stack" style="margin-top:18px">`;
   (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
     h+=`<article class="day${d.date===today?' today':''}"><div class="dayhead"><h3>${L.name} <span class="muted num" style="font-weight:400">${L.short}</span></h3></div>`;    ['lunch','dinner','dessert'].filter(s=>s!=='dessert'||d.dessert).forEach(slot=>{const m=d[slot]||{};const has=m.recipeId&&S.recipes.has(m.recipeId);
-      const sw=S.swap&&S.swap.di===di&&S.swap.slot===slot;
+      const sw=S.swap&&S.swap.pid===W.pid&&S.swap.di===di&&S.swap.slot===slot;
       const rr=has?S.recipes.get(m.recipeId):null;
       h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
         ${m.leftover?'<span class="leftover">Zbytek</span>':''}
@@ -366,16 +380,16 @@ function renderWeek(){
       </div></div>`});
     h+='</article>'});
   h+='</div>';
-  const dl=S.deals;
+  const dl=W.w==='next'?(MEM.docs.get('deals-next')||S.deals):S.deals;
   if(dl?.items?.length){h+=`<details class="panel" style="margin-top:18px"><summary>Akce, ze kterých plán vychází (${dl.items.length})</summary>
     ${dl.note?`<p class="sub">${esc(dl.note)}</p>`:''}<div class="scroll"><table class="deals"><tbody>`;
     dl.items.forEach(x=>{h+=`<tr><td><b>${esc(x.name)}</b><div class="sub">${esc(x.store)} · do ${esc(x.until||'')}</div></td><td class="r num"><span class="tagp"><span class="p sale">${esc(x.price)}</span>${x.regular?`<s>${esc(x.regular)}</s>`:''}</span></td></tr>`});
     h+='</tbody></table></div>';
     if(dl.season?.length)h+=`<p class="sub" style="margin-bottom:0"><b>Sezóna teď:</b> ${esc(dl.season.join(', '))}</p>`;
     h+='</details>'}
-  el.innerHTML=h;
+  el.innerHTML=h;bindSeg();
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open,'week'));
-  el.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.swap.split('|');S.swap={di:+di,slot,hint:'',busy:false,msg:''};renderWeek();$('swap-hint')?.focus()});
+  el.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.swap.split('|');S.swap={pid:W.pid,di:+di,slot,hint:'',busy:false,msg:''};renderWeek();$('swap-hint')?.focus()});
   if($('swap-hint')){$('swap-hint').oninput=e=>S.swap.hint=e.target.value;
     $('swap-hint').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();askSwap('own')}};
     $('swap-x').onclick=()=>{S.swap=null;renderWeek()};$('swap-3').onclick=()=>askSwap('three');$('swap-own').onclick=()=>askSwap('own');
@@ -395,13 +409,13 @@ function reqBox(date,slot){const q=reqFor(date,slot);if(!q)return '';
   if(q.status==='error')return `<div class="swapbox"><div class="mnote">${esc(q.message||'Návrh se nepovedl.')}</div><button class="btn ghost" data-reqcancel="${esc(q.id)}">Zavřít</button></div>`;
   return `<div class="swapbox"><div class="mnote">Čeká na návrhy od Clauda, obvykle do 2 hodin${q.hint?` · „${esc(q.hint)}“`:''}.</div><div class="row"><button class="btn ghost" data-reqcancel="${esc(q.id)}">Zrušit žádost</button></div></div>`}
 async function pickReq(id,i){const q=(S.requests||[]).find(r=>r.id===id);const r=q?.options?.[i];if(!r)return;
-  const di=S.plan.days.findIndex(d=>d.date===q.date);if(di<0){toast('Tento den už v plánu není.');return}
-  if(await applyPick(di,q.slot,cleanRecipeKeep(r),null))await write(()=>db.doc('meta/'+id).delete())}
+  const pf=planForDate(q.date);const di=pf?pf.p.days.findIndex(d=>d.date===q.date):-1;if(di<0){toast('Tento den už v plánu není.');return}
+  if(await applyPick(di,q.slot,cleanRecipeKeep(r),null,pf.pid))await write(()=>db.doc('meta/'+id).delete())}
 async function pickLib(rid){const sw=S.swap;const r=S.recipes.get(rid);if(!sw||!r)return;
-  if(await applyPick(sw.di,sw.slot,r,rid))S.swap=null}
+  if(await applyPick(sw.di,sw.slot,r,rid,sw.pid))S.swap=null}
 function cleanRecipeKeep(r){const c=cleanRecipe(r);if(r.sourceUrl)c.sourceUrl=String(r.sourceUrl);if(r.sourceLabel)c.sourceLabel=String(r.sourceLabel);return c}
-async function applyPick(di,slot,r,existingId){
-  const p=S.plan;const id=existingId||('r-'+Date.now().toString(36));
+async function applyPick(di,slot,r,existingId,pid){
+  pid=pid||S.planId;const p=planOf(pid);const id=existingId||('r-'+Date.now().toString(36));
   const days=JSON.parse(JSON.stringify(p.days));const d=days[di];const old=d[slot]||{};
   d[slot]={title:r.title,recipeId:id,note:r.batch&&slot==='dinner'?'Uvařte víc, zbytek je zítřejší oběd.':''};
   if(Array.isArray(r.pantry)&&r.pantry.length)d[slot].pantry=r.pantry;
@@ -412,7 +426,7 @@ async function applyPick(di,slot,r,existingId){
     else if(!r.batch&&wasLeft)next.lunch={title:'Volný oběd – vyberte jídlo',recipeId:null,note:''};}
   try{
     if(!existingId)await db.doc('recipes/'+id).set({...r,source:r.source||'Claude – výměna jídla',createdAt:new Date().toISOString()});
-    await db.doc('meta/plan').update({days});
+    await db.doc('meta/'+pid).update({days});
     toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id,'week');return true;
   }catch(e){toast('Uložení se nepovedlo. Zkuste to znovu.');return false}
 }
@@ -433,7 +447,7 @@ function swapBox(){const sw=S.swap;const b=sw.busy;
 async function askSwap(mode){
   const sw=S.swap;if(!sw||sw.busy)return;
   if(mode==='own'&&!(sw.hint||'').trim()){sw.msg='Napište, na co máte chuť.';renderWeek();return}
-  const p=S.plan;const d=p.days[sw.di];const old=d[sw.slot]||{};
+  const p=planOf(sw.pid);const d=p.days[sw.di];const old=d[sw.slot]||{};
   if(!sample){const id='req-'+Date.now().toString(36);
     const ok=await write(()=>db.doc('meta/'+id).set({type:'swap',mode,date:d.date,slot:sw.slot,oldTitle:old.title||'',hint:(sw.hint||'').trim(),status:'waiting',createdAt:new Date().toISOString()}));
     if(ok){S.swap=null;toast('Posláno Claudovi. Návrhy se objeví u tohoto jídla.');renderWeek()}return}
@@ -472,7 +486,7 @@ Odpověz pouze JSON polem s jedním objektem: ${recipeJSONSpec()}`;
 }
 async function pickSwap(i){
   const sw=S.swap;const r=sw?.options?.[i];if(!r||sw.busy)return;sw.busy='pick';renderWeek();
-  if(await applyPick(sw.di,sw.slot,r,null))S.swap=null;else{sw.busy=false;renderWeek()}
+  if(await applyPick(sw.di,sw.slot,r,null,sw.pid))S.swap=null;else{sw.busy=false;renderWeek()}
 }
 function sampleMsg(e){const c=e?.code;
   if(c==='not_granted'||c==='sampling_disabled')return 'Claude tady nemá povolení. Povolte ho v dialogu, který se objeví při dalším pokusu po znovunačtení.';
@@ -504,7 +518,7 @@ function dish(look,key){const L=cleanLook(look)||{vessel:'plate',base:'#d9b779',
   return s+'<ellipse cx="38" cy="34" rx="10" ry="4" fill="#fff" opacity=".18" transform="rotate(-30 38 34)"/></svg>'}
 
 /* ---------- shopping ---------- */
-function sortItems(a,b){return (a.trip||1)-(b.trip||1)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||CATS.indexOf(a.cat)-CATS.indexOf(b.cat)||(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,'cs')}
+function sortItems(a,b){return (itemWeek(a)==='next'?1:0)-(itemWeek(b)==='next'?1:0)||(a.trip||1)-(b.trip||1)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||CATS.indexOf(a.cat)-CATS.indexOf(b.cat)||(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,'cs')}
 function renderShop(){
   const all=S.items;const open=all.filter(i=>!i.checked);
   $('badge').textContent=open.length?`(${open.length})`:'';
@@ -513,15 +527,16 @@ function renderShop(){
   $('nak-sum').textContent=!S.loaded.items?'Načítám seznam…':all.length?`Zbývá ${open.length} z ${all.length} položek · zbývá zhruba ${kcRound(sumOpen)}`:'Seznam je prázdný.';
   const stores=[...new Set(all.map(i=>i.store||'Kdekoli'))].sort((a,b)=>STORES.indexOf(a)-STORES.indexOf(b));
   const hasTrip2=all.some(i=>i.trip===2);
-  const filters=['Vše',...stores,...(hasTrip2?['2. nákup']:[])];
+  const hasNext=all.some(i=>itemWeek(i)==='next');
+  const filters=['Vše',...stores,...(hasTrip2?['2. nákup']:[]),...(hasNext?['Příští týden']:[])];
   if(!filters.includes(S.filter))S.filter='Vše';
   $('nak-chips').innerHTML=filters.map(f=>`<button class="chip" aria-pressed="${f===S.filter}" data-f="${esc(f)}">${esc(f)}</button>`).join('');
   $('nak-chips').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;renderShop()});
-  let list=all.filter(i=>S.filter==='Vše'||(S.filter==='2. nákup'?i.trip===2:(i.store||'Kdekoli')===S.filter));
+  let list=all.filter(i=>S.filter==='Vše'||(S.filter==='Příští týden'?itemWeek(i)==='next':S.filter==='2. nákup'?i.trip===2&&itemWeek(i)==='this':(i.store||'Kdekoli')===S.filter));
   list.sort((a,b)=>(a.checked?1:0)-(b.checked?1:0)||sortItems(a,b));
   if(!all.length&&S.loaded.items){$('nak-list').innerHTML='<div class="empty" style="margin-top:12px">Zatím tu nic není. Přidejte první položku níže, nebo počkejte na týdenní plán.</div>';return}
   const groups=new Map();
-  list.forEach(i=>{const k=i.checked?'Koupeno':((i.trip===2?'2. nákup · ':'')+(i.store||'Kdekoli'));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(i)});
+  list.forEach(i=>{const nx=itemWeek(i)==='next';const k=i.checked?'Koupeno':((nx?'Příští týden · ':'')+(i.trip===2?'2. nákup · ':'')+(i.store||'Kdekoli'));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(i)});
   let h='';
   groups.forEach((arr,k)=>{const s=arr.reduce((a,i)=>a+(Number(i.price)||0),0);
     h+=`<div class="group"><h3>${esc(k)} <small class="num">${arr.length} ${s?'· '+kcRound(s):''}</small></h3><div class="items">`;
@@ -571,15 +586,17 @@ function renderRecipes(){
   if(!rs.length){el.innerHTML=`<div class="empty">${q?'Nic takového tu není.':(S.rf==='Uložené'?'Zatím žádné uložené recepty. Vložte odkaz níže.':S.rf==='Oblíbené'?'Zatím žádné oblíbené. Recept oblíbíte hvězdičkou v jeho detailu.':'Zatím žádné recepty.')}</div>`;return}
   el.innerHTML=rs.map(r=>`<div class="stack" style="gap:6px"><button class="rcard" data-open="${esc(r.id)}"><span class="thumb">${pic(r,r.id)}</span><span style="min-width:0"><h3>${r.fav?'★ ':''}${esc(r.title)}</h3>
     <div class="sub num" style="margin-bottom:6px">${r.time?r.time+' min':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}${r.rating==='up'?' · chutnalo':r.rating==='down'?' · nechutnalo':''}</div>
-    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>${(r.saved||r.fav)&&r.importStatus!=='waiting'?`<div class="row" style="gap:8px"><button class="btn" data-addweek="${esc(r.id)}" style="padding:6px 12px">+ Přidat do týdne</button></div><div data-pick="${esc(r.id)}"></div>`:''}</div>`).join('');
+    ${impLine(r)}<div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></span></button>${(r.saved||r.fav)&&r.importStatus!=='waiting'?`<div class="row" style="gap:8px"><button class="btn" data-addweek="${esc(r.id)}" style="padding:6px 12px">+ Přidat do jídelníčku</button></div><div data-pick="${esc(r.id)}"></div>`:''}</div>`).join('');
   el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open));
   el.querySelectorAll('[data-addweek]').forEach(b=>b.onclick=()=>{const id=b.dataset.addweek,box=el.querySelector(`[data-pick="${CSS.escape(id)}"]`);
     if(box.innerHTML){box.innerHTML='';return}box.innerHTML=pickerHTML('pk-'+id);bindPicker('pk-'+id,id,()=>{box.innerHTML=''})});
 }
 $('r-q').oninput=e=>{S.q=e.target.value;renderRecipes()};
 /* ---------- import recipe from a link: recipe placeholder + req {type:'import'} handled by the scheduled task ---------- */
-function planDayOptions(sel){const t=todayISO();const ds=(S.plan?.days||[]).filter(d=>d.date>=t);
-  return ds.map(d=>{const L=dateLabel(d.date);return `<option value="${d.date}" ${d.date===sel?'selected':''}>${L.name} ${L.short}</option>`}).join('')}
+function planDayOptions(sel){const t=todayISO();const opt=d=>{const L=dateLabel(d.date);return `<option value="${d.date}" ${d.date===sel?'selected':''}>${L.name} ${L.short}</option>`};
+  const a=(S.plan?.days||[]).filter(d=>d.date>=t),b=(S.planNext?.days||[]).filter(d=>d.date>=t);
+  if(!b.length)return a.map(opt).join('');if(!a.length)return `<optgroup label="Příští týden">${b.map(opt).join('')}</optgroup>`;
+  return `<optgroup label="Tento týden">${a.map(opt).join('')}</optgroup><optgroup label="Příští týden">${b.map(opt).join('')}</optgroup>`}
 function pickerHTML(k){const o=planDayOptions();if(!o)return '<p class="sub" style="margin:0">Tento týden už nezbývá žádný den.</p>';
   return `<div class="panel stack" style="gap:8px"><div class="row" style="flex-wrap:nowrap"><select id="${k}-d" aria-label="Den" style="flex:1">${o}</select><select id="${k}-s" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div><div class="row"><button class="btn primary" id="${k}-go">Přidat</button><span class="sub">Claude přepočítá porce na ten den a doplní nákupní seznam – do 2 hodin.</span></div></div>`}
 function bindPicker(k,id,done){const go=document.getElementById(k+'-go');if(!go)return;const r=S.recipes.get(id)||{};
@@ -599,7 +616,7 @@ function openRecipe(id,ctx){S.openRecipe=id||null;S.recipeCtx=ctx||'lib';S.recip
 function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.recipes.get(id);
   if(r0&&!sh.hidden&&sh.dataset.rid===id&&($('sh-editbox')?.innerHTML||document.activeElement?.id==='sh-mynote'))return; sh.dataset.rid=id||'';
   if(!r0){sh.hidden=true;document.body.style.overflow='';return}
-  const weekVer=!!r0.general&&S.recipeCtx==='week'&&S.plan?.weekStart===r0.general.fromWeek;
+  const weekVer=!!r0.general&&S.recipeCtx==='week'&&[S.plan?.weekStart,S.planNext?.weekStart].includes(r0.general.fromWeek);
   const showGen=!!r0.general&&(weekVer?S.recipeAlt:!S.recipeAlt);
   const r=showGen?RV(r0):r0;
   const genPending=r0.fav&&!r0.general&&!r0.saved;
@@ -619,7 +636,7 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.
     <div class="row"><button class="btn" id="sh-add">Přidat suroviny na seznam</button><a class="btn" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Fotky tohoto jídla ↗</a></div>
     ${r.sourceUrl?`<a class="panel" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:var(--ink)"><span class="eyebrow">Recept na webu</span><br><b>${esc(r.sourceLabel||r.sourceUrl.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</b> ↗</a>`:''}
     <h3>Postup</h3><ol>${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
-    ${r.importStatus==='waiting'?'':`<div class="stack" style="gap:8px"><h3>Přidat do týdne</h3>${pickerHTML('shp')}</div>`}
+    ${r.importStatus==='waiting'?'':`<div class="stack" style="gap:8px"><h3>Přidat do jídelníčku</h3>${pickerHTML('shp')}</div>`}
     <div class="stack" style="gap:6px"><h3>Naše poznámky</h3><textarea id="sh-mynote" placeholder="Např. příště víc česneku, malý jí bez omáčky…" style="min-height:70px">${esc(r0.userNote||'')}</textarea><span class="sub" id="sh-mynote-st">Ukládá se samo. Claude poznámky čte při plánování.</span></div>
     <div class="row"><button class="btn" id="sh-edit">Upravit recept</button><button class="btn" id="sh-del" style="color:#a1331a">Smazat recept</button></div>
     <div id="sh-editbox"></div>
@@ -651,7 +668,7 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.
     try{const up=await assets.upload(f);await write(()=>db.doc('recipes/'+id).update({photo:up.id}),'Fotka uložena.')}catch(err){toast(err?.code==='too_large'?'Fotka je moc velká (max 20 MB).':'Fotku se nepodařilo nahrát.')}};
   if($('sh-nophoto'))$('sh-nophoto').onclick=()=>write(()=>db.doc('recipes/'+id).update({photo:null}));
   $('sh-fav').onclick=async()=>{const on=!r0.fav;if(!await write(()=>db.doc('recipes/'+id).update({fav:on})))return;
-    if(on&&!r0.general&&!r0.saved)await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'generalize',recipeId:id,weekStart:S.plan?.weekStart||'',status:'waiting',createdAt:new Date().toISOString()}),'Přidáno do oblíbených. Claude připraví obecnou verzi receptu – do 2 hodin.')};
+    if(on&&!r0.general&&!r0.saved)await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'generalize',recipeId:id,weekStart:(S.recipeCtx==='week'?WP().p?.weekStart:S.plan?.weekStart)||'',status:'waiting',createdAt:new Date().toISOString()}),'Přidáno do oblíbených. Claude připraví obecnou verzi receptu – do 2 hodin.')};
   sh.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>write(()=>db.doc('recipes/'+id).update({rating:r.rating===b.dataset.rate?null:b.dataset.rate})));
   $('sh-add').onclick=async()=>{const base=Date.now();let n=0;for(const i of r.ingredients||[]){const ok=await write(()=>db.collection('items').add({name:i.name,qty:i.qty,store:'Kdekoli',cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',note:r.title,trip:1,order:base+n}));if(!ok)return;n++}toast(`Přidáno ${n} surovin na seznam.`)};
 }
@@ -844,8 +861,8 @@ function pantryDoc(){return S.pantry||(typeof MEM!=='undefined'&&MEM.docs.get('p
 async function savePantry(patch,msg){return write(()=>db.doc('meta/pantry').set({...pantryDoc(),...patch}),msg)}
 let pantryBusy=false;
 async function consumePantry(){
-  if(pantryBusy||!db||!S.plan?.days)return;const pd=pantryDoc();const items=(pd.items||[]).map(x=>({...x}));const done=new Set(pd.done||[]);const today=todayISO();let changed=false;
-  for(const d of S.plan.days){if(d.date>=today)continue;
+  if(pantryBusy||!db||!(S.plan?.days||S.planNext?.days))return;const pd=pantryDoc();const items=(pd.items||[]).map(x=>({...x}));const done=new Set(pd.done||[]);const today=todayISO();let changed=false;
+  for(const d of [...(S.plan?.days||[]),...(S.planNext?.days||[])]){if(d.date>=today)continue;
     for(const slot of ['lunch','dinner','dessert']){const m=d[slot];if(!m||!Array.isArray(m.pantry)||!m.pantry.length)continue;const key=d.date+':'+slot;if(done.has(key))continue;
       done.add(key);changed=true;
       for(const u of m.pantry){const k=normName(u.name);const i=items.findIndex(x=>normName(x.name)===k);const j=i>=0?i:items.findIndex(x=>normName(x.name).includes(k)||k.includes(normName(x.name)));
@@ -907,6 +924,6 @@ function render(){
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="src/data-layer.js?v=15"></script>
+<script src="src/data-layer.js?v=16"></script>
 </body>
 </html>
