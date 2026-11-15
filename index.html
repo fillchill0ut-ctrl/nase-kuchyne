@@ -415,7 +415,11 @@ async function setSkip(pid,di,slot,on){const p=planOf(pid);if(!p)return;const da
   const nx=days[di+1];if(slot==='dinner'&&nx?.lunch?.leftover&&m.recipeId&&nx.lunch.recipeId===m.recipeId){if(on)nx.lunch.skip=true;else delete nx.lunch.skip;alsoLunch=true}
   if(!await write(()=>db.doc('meta/'+pid).update({days})))return;S.swap=null;
   const sk=skippedSet();
-  for(const i of S.items){if(i.checked||!Array.isArray(i.meals)||!i.meals.length)continue;const all=i.meals.every(k=>sk.has(k));if(all!==!!i.skipped)await write(()=>db.doc('items/'+i.id).update({skipped:all}))}
+  /* touch only items of the meal(s) just changed: skip hides those needed by nothing else, undo shows again only those hidden by a skip */
+  const ch=new Set([d.date+':'+slot,...(alsoLunch?[nx.date+':lunch']:[])]);
+  for(const i of S.items){if(i.checked||!Array.isArray(i.meals)||!i.meals.some(k=>ch.has(k)))continue;const all=i.meals.every(k=>sk.has(k));
+    if(on&&all&&!i.skipped)await write(()=>db.doc('items/'+i.id).update({skipped:true,skipBy:'meal'}));
+    else if(!on&&!all&&i.skipped&&i.skipBy==='meal')await write(()=>db.doc('items/'+i.id).update({skipped:false,skipBy:null}))}
   await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'skip',pid,date:d.date,slot,alsoLunch,undo:!on,status:'waiting',createdAt:new Date().toISOString()}));
   toast(on?(alsoLunch?'Nevaříme – i zítřejší oběd ze zbytků odpadá. Nákup se upraví.':'Nevaříme – suroviny jdou z nákupu pryč.'):'Vrátili jsme jídlo do plánu i na nákup.')}
 function optCard(r,key,attr){return `<div class="opt"><span class="thumb">${dish(r.look,key)}</span><div style="min-width:0"><h3>${esc(r.title)}</h3>
