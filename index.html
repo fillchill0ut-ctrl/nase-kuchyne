@@ -327,6 +327,8 @@ function pickPlans(docs){const t=todayISO();const L=[['plan',docs.get('plan')],[
 function WP(w){w=w||S.wk;return w==='next'?{p:S.planNext,pid:S.planNextId,w:'next'}:{p:S.plan,pid:S.planId,w:'this'}}
 function planOf(id){return id===S.planNextId&&S.planNext?S.planNext:S.plan}
 function planForDate(date){for(const [p,pid] of [[S.plan,S.planId],[S.planNext,S.planNextId]])if(p?.days?.some(d=>d.date===date))return {p,pid};return null}
+/* items from weeks before this one never show (stale leftovers of old plans) */
+function isLive(i){return !i.skipped&&!(i.weekStart&&S.plan?.weekStart&&i.weekStart<S.plan.weekStart)}
 function itemWeek(i){return S.planNext&&i.weekStart&&i.weekStart===S.planNext.weekStart?'next':'this'}
 function dateLabel(iso){const [y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d);return {name:DAYN[dt.getDay()],short:d+'. '+m+'.'}}
 
@@ -335,7 +337,7 @@ const VTITLE={tyden:'Týden',nakup:'Nákup',doma:'Doma',recepty:'Recepty',profil
 function plural(n,a,b,c){return n===1?a:(n>=2&&n<=4?b:c)}
 function setHeader(){const v=S.view||'tyden';if(!$('vt'))return;$('vt').textContent=VTITLE[v]||'';let r='';
   if(v==='tyden')r=(WP().p?.weekLabel||'').replace(/^Týden\s*/,'');
-  else if(v==='nakup'){const n=(S.items||[]).filter(i=>!i.checked&&!i.skipped).length;r=n?`${n} ${plural(n,'položka','položky','položek')}`:''}
+  else if(v==='nakup'){const n=(S.items||[]).filter(i=>!i.checked&&isLive(i)).length;r=n?`${n} ${plural(n,'položka','položky','položek')}`:''}
   else if(v==='doma'){const n=(pantryDoc().items||[]).length;r=n?`${n} ${plural(n,'potravina','potraviny','potravin')}`:''}
   else if(v==='recepty'){const n=S.recipes?.size||0;r=n?`${n} ${plural(n,'recept','recepty','receptů')}`:''}
   $('hdr').textContent=r}
@@ -354,7 +356,7 @@ function renderWeek(){
   if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
   if(!p){el.innerHTML=seg+`<div class="empty">${W.w==='next'?'Plán na příští týden ještě není. Claude ho připravuje vždy v pátek odpoledne, až vyjdou nové letáky – i s nákupem na víkend.':'Plán na tento týden ještě není.'}</div>`;bindSeg();return}
   const today=todayISO();
-  const wItems=S.items.filter(i=>itemWeek(i)===W.w&&!i.skipped);
+  const wItems=S.items.filter(i=>itemWeek(i)===W.w&&isLive(i));
   const open=wItems.filter(i=>!i.checked);
   const est=wItems.reduce((a,i)=>a+(Number(i.price)||0),0);
   let h=seg?seg:`<h2>${esc(p.weekLabel||'Tento týden')}</h2>`;
@@ -565,7 +567,7 @@ function dish(look,key){const L=cleanLook(look)||{vessel:'plate',base:'#d9b779',
 /* ---------- shopping ---------- */
 function sortItems(a,b){return (itemWeek(a)==='next'?1:0)-(itemWeek(b)==='next'?1:0)||(a.trip||1)-(b.trip||1)||STORES.indexOf(a.store)-STORES.indexOf(b.store)||CATS.indexOf(a.cat)-CATS.indexOf(b.cat)||(a.order||0)-(b.order||0)||String(a.name).localeCompare(b.name,'cs')}
 function renderShop(){
-  const all=S.items.filter(i=>!i.skipped);const open=all.filter(i=>!i.checked);
+  const all=S.items.filter(isLive);const open=all.filter(i=>!i.checked);
   $('badge').textContent=open.length?`(${open.length})`:'';
   if(S.view!=='nakup')return;
   const sumOpen=open.reduce((a,i)=>a+(Number(i.price)||0),0);
