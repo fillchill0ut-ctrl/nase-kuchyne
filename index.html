@@ -406,7 +406,7 @@ function renderWeek(){
   el.querySelectorAll('[data-reqpick]').forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.reqpick.split('|');pickReq(id,+i)});
 }
 /* swap requests handled by Claude on the Pro plan (until the API is switched on) */
-function reqFor(date,slot){return (S.requests||[]).find(r=>r.type!=='skip'&&r.date===date&&r.slot===slot&&r.status!=='done')}
+function reqFor(date,slot){return (S.requests||[]).find(r=>r.type!=='skip'&&r.type!=='reshop'&&r.date===date&&r.slot===slot&&r.status!=='done')}
 /* "Nebudeme dělat": meal.skip – its ingredients leave the shopping list (items tagged with meals:["date:slot"]) and Doma is not reduced.
    A leftover lunch made from that dinner is skipped too. Claude then fixes shared or untagged items (request type 'skip'). */
 function skippedSet(){const s=new Set();for(const p of [S.plan,S.planNext])(p?.days||[]).forEach(d=>['lunch','dinner','dessert'].forEach(sl=>{if(d[sl]?.skip)s.add(d.date+':'+sl)}));return s}
@@ -444,10 +444,34 @@ async function applyPick(di,slot,r,existingId,pid){
   try{
     if(!existingId)await db.doc('recipes/'+id).set({...r,source:r.source||'Claude – výměna jídla',createdAt:new Date().toISOString()});
     await db.doc('meta/'+pid).update({days});
-    toast('Jídlo vyměněno. Suroviny přidáte z receptu.');openRecipe(id,'week');return true;
+    const keys=[d.date+':'+slot];if(slot==='dinner'&&next&&(next.lunch?.leftover||old.recipeId&&next.lunch?.recipeId===null))keys.push(next.date+':lunch');
+    const n=await reshop(pid,p.weekStart,keys,r,id,d.date,slot);
+    toast(n.added||n.hidden?`Jídlo vyměněno. Nákup upraven: ${n.added} přidáno, ${n.hidden} odebráno.`:'Jídlo vyměněno.');openRecipe(id,'week');return true;
   }catch(e){toast('Uložení se nepovedlo. Zkuste to znovu.');return false}
 }
 
+/* after a meal is swapped: hide items needed only by the replaced meal(s), add the new recipe's shopping (r.shop from Claude, or its ingredients minus Doma and the list),
+   then ask Claude (request 'reshop') to fix shared quantities, prices and stores */
+async function reshop(pid,weekStart,keys,r,rid,date,slot){let hidden=0,added=0;const ks=new Set(keys);const sk=skippedSet();
+  const wk=i=>(i.weekStart||'')===(weekStart||'')||(!i.weekStart&&pid===S.planId);
+  const has=(arr,n)=>{n=normName(n).replace(/\(.*?\)/g,'').trim();const w=n.split(' ')[0];return arr.some(x=>x&&(x.includes(n)||n.includes(x)||(w.length>3&&x.split(' ')[0]===w)))};
+  const pant=(pantryDoc().items||[]).map(x=>normName(x.name));
+  const meals=keys.filter(k=>!k.endsWith(':lunch')||r.batch);
+  let wanted=Array.isArray(r.shop)?r.shop.slice():(r.ingredients||[]).filter(g=>!/doma|podle chuti|sůl|pepř|voda/i.test((g.name||'')+' '+(g.qty||''))).filter(g=>!has(pant,g.name));
+  for(const i of S.items){if(i.checked||i.skipped||!wk(i)||!Array.isArray(i.meals)||!i.meals.length)continue;
+    if(!i.meals.some(k=>ks.has(k)))continue;
+    const gi=wanted.findIndex(g=>has([normName(i.name)],g.name));
+    if(gi>=0){const rest=i.meals.filter(k=>!ks.has(k));await write(()=>db.doc('items/'+i.id).update({meals:[...new Set([...rest,...meals])]}));wanted.splice(gi,1);continue}
+    if(i.meals.every(k=>ks.has(k)||sk.has(k))){if(await write(()=>db.doc('items/'+i.id).update({skipped:true})))hidden++}}
+  const listed=S.items.filter(i=>wk(i)&&!i.skipped).map(i=>normName(i.name));
+  const trip=Math.max(1,...S.items.filter(i=>wk(i)&&!i.checked&&!i.skipped).map(i=>i.trip||1));
+  const store=(S.items.find(i=>wk(i)&&!i.checked&&!i.skipped&&(i.trip||1)===trip)||{}).store||'Kdekoli';
+  for(const g of wanted){if(!Array.isArray(r.shop)&&has(listed,g.name))continue;
+    const iid='s-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+    const it={name:g.name,qty:g.qty||'',store:g.store||store,cat:g.cat||'Ostatní',price:g.price??null,regular:null,sale:false,checked:false,source:'plan',weekStart:weekStart||'',trip:g.trip||trip,order:Date.now(),note:g.note||('Pro '+(r.title||'nové jídlo')+(Array.isArray(r.shop)?'':' – množství a cenu upřesní Claude')),meals};
+    if(await write(()=>db.doc('items/'+iid).set(it)))added++}
+  await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'reshop',pid,date,slot,keys,recipeId:rid,hadShop:Array.isArray(r.shop),status:'waiting',createdAt:new Date().toISOString()}));
+  return {hidden,added}}
 function recipeJSONSpec(){return 'Odpověz pouze JSON objektem v češtině: {"title":"název","batch":true,"servings":4,"time":35,"active":15,"tags":["rychlé","do krabičky"],"ingredients":[{"name":"kuřecí stehna","qty":"800 g"}],"steps":["krok 1","krok 2"],"note":"jedna věta: proč toto jídlo a s čím navazuje","look":{"vessel":"plate","base":"#e8c27a","pieces":["#b5562f","#e07a2f","#7a3b8f"],"garnish":"#4f8a3c"}}. time a active jsou minuty celkem a aktivně. look je náhled hotového jídla: vessel je plate, bowl, pan, tray nebo pot; base je barva hlavní části (omáčka, polévka, příloha); pieces jsou 3–5 barev hlavních surovin, jak vypadají uvařené; garnish je barva bylinek nebo null.'}
 function swapBox(){const sw=S.swap;const b=sw.busy;
   let x=`<div class="swapbox"><button class="btn primary" id="swap-3" ${b?'disabled':''}>${b==='three'?'Claude vymýšlí 3 možnosti…':(sample?'Navrhni 3 možnosti':'Požádat Clauda o 3 návrhy')}</button>
