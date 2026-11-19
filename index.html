@@ -354,7 +354,10 @@ function renderWeek(){
   const seg=`<div class="seg wide" role="group" aria-label="Týden" style="margin-bottom:14px"><button type="button" data-wk="this" aria-pressed="${W.w==='this'}">Tento týden</button><button type="button" data-wk="next" aria-pressed="${W.w==='next'}">Příští týden</button></div>`;
   const bindSeg=()=>el.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{S.wk=b.dataset.wk;S.swap=null;try{localStorage.setItem('nk-wk',S.wk)}catch(e){}renderWeek();setHeader();window.scrollTo(0,0)});
   if(!S.loaded.plan){el.innerHTML='<h2>Tento týden</h2><p class="sub">Načítám plán…</p>';return}
-  if(!p){el.innerHTML=seg+`<div class="empty">${W.w==='next'?'Plán na příští týden ještě není. Claude ho připravuje vždy v pátek odpoledne, až vyjdou nové letáky – i s nákupem na víkend.':'Plán na tento týden ještě není.'}</div>`;bindSeg();return}
+  if(!p){const ws=W.w==='next'?wishes().map((x,i)=>({...x,i})).filter(x=>x.weekStart===nextWeekStart()):[];
+    el.innerHTML=seg+`<div class="empty">${W.w==='next'?'Plán na příští týden ještě není. Claude ho připravuje vždy v pátek odpoledne, až vyjdou nové letáky – i s nákupem na víkend.':'Plán na tento týden ještě není.'}</div>`+
+      (ws.length?`<div class="panel stack" style="gap:8px;margin-top:14px"><h3 style="margin:0">Chcete příští týden</h3>${ws.map(x=>`<div class="row" style="justify-content:space-between;flex-wrap:nowrap"><span><b>${esc(x.title)}</b><span class="sub"> · ${x.date?dateLabel(x.date).name+' ':'kterýkoli den · '}${SLOTN[x.slot]||''}</span></span><button class="link" data-unwish="${x.i}" style="color:var(--muted)">Odebrat</button></div>`).join('')}<p class="sub" style="margin:0">Claude je zařadí do pátečního plánu a přepočítá porce.</p></div>`:'');
+    bindSeg();el.querySelectorAll('[data-unwish]').forEach(b=>b.onclick=()=>delWish(+b.dataset.unwish));return}
   const today=todayISO();
   const wItems=S.items.filter(i=>itemWeek(i)===W.w&&isLive(i));
   const open=wItems.filter(i=>!i.checked);
@@ -640,14 +643,25 @@ function renderRecipes(){
 }
 $('r-q').oninput=e=>{S.q=e.target.value;renderRecipes()};
 /* ---------- import recipe from a link: recipe placeholder + req {type:'import'} handled by the scheduled task ---------- */
+function isoD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function nextWeekStart(){if(S.planNext?.weekStart)return S.planNext.weekStart;const d=new Date();d.setHours(12);d.setDate(d.getDate()+((8-d.getDay())%7||7));return isoD(d)}
+function nextWeekDays(){const s=nextWeekStart();return [0,1,2,3,4,5,6].map(i=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+i);return {date:isoD(d)}})}
 function planDayOptions(sel){const t=todayISO();const opt=d=>{const L=dateLabel(d.date);return `<option value="${d.date}" ${d.date===sel?'selected':''}>${L.name} ${L.short}</option>`};
-  const a=(S.plan?.days||[]).filter(d=>d.date>=t),b=(S.planNext?.days||[]).filter(d=>d.date>=t);
+  const a=(S.plan?.days||[]).filter(d=>d.date>=t),b0=(S.planNext?.days||[]).filter(d=>d.date>=t);
+  const b=b0.length?b0:nextWeekDays().filter(d=>d.date>=t&&!(S.plan?.days||[]).some(x=>x.date===d.date));
+  if(!b0.length&&b.length){const any=`<option value="any">Kterýkoli den – vybere Claude</option>`;return (a.length?`<optgroup label="Tento týden">${a.map(opt).join('')}</optgroup>`:'')+`<optgroup label="Příští týden (plán ještě není)">${any}${b.map(opt).join('')}</optgroup>`}
   if(!b.length)return a.map(opt).join('');if(!a.length)return `<optgroup label="Příští týden">${b.map(opt).join('')}</optgroup>`;
   return `<optgroup label="Tento týden">${a.map(opt).join('')}</optgroup><optgroup label="Příští týden">${b.map(opt).join('')}</optgroup>`}
 function pickerHTML(k){const o=planDayOptions();if(!o)return '<p class="sub" style="margin:0">Tento týden už nezbývá žádný den.</p>';
-  return `<div class="panel stack" style="gap:8px"><div class="row" style="flex-wrap:nowrap"><select id="${k}-d" aria-label="Den" style="flex:1">${o}</select><select id="${k}-s" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div><div class="row"><button class="btn primary" id="${k}-go">Přidat</button><span class="sub">Claude přepočítá porce na ten den a doplní nákupní seznam – do 2 hodin.</span></div></div>`}
+  return `<div class="panel stack" style="gap:8px"><div class="row" style="flex-wrap:nowrap"><select id="${k}-d" aria-label="Den" style="flex:1">${o}</select><select id="${k}-s" aria-label="Jídlo" style="flex:0 0 120px"><option value="dinner">Večeře</option><option value="lunch">Oběd</option><option value="dessert">Moučník</option></select></div><div class="row"><button class="btn primary" id="${k}-go">Přidat</button><span class="sub">Claude přepočítá porce na ten den a doplní nákupní seznam.${S.planNext?.weekStart?'':' Na příští týden s ním počítá při pátečním plánování.'}</span></div></div>`}
+/* wishes for a week that is not planned yet: docs 'wishes' {items:[{recipeId,title,weekStart,date|null,slot}]} */
+function wishes(){return (MEM.docs.get('wishes')?.items||[])}
+async function addWish(w){const it=wishes().filter(x=>!(x.recipeId===w.recipeId&&x.weekStart===w.weekStart));it.push(w);return write(()=>db.doc('meta/wishes').set({items:it}))}
+async function delWish(i){const it=wishes().slice();it.splice(i,1);return write(()=>db.doc('meta/wishes').set({items:it}),'Odebráno.')}
 function bindPicker(k,id,done){const go=document.getElementById(k+'-go');if(!go)return;const r=S.recipes.get(id)||{};
   go.onclick=async()=>{const date=document.getElementById(k+'-d').value,slot=document.getElementById(k+'-s').value;
+    const planned=[...(S.plan?.days||[]),...(S.planNext?.days||[])].some(d=>d.date===date);
+    if(!planned){if(await addWish({recipeId:id,title:RV(r).title||r.title||'',weekStart:nextWeekStart(),date:date==='any'?null:date,slot,addedAt:new Date().toISOString()})){toast('Uloženo – Claude ho zařadí, až bude v pátek plánovat příští týden.');done()}return}
     if(await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'import',recipeId:id,url:r.sourceUrl||'',plan:{date,slot},onlyPlace:true,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi – recept zařadí do 2 hodin.'))done()}}
 function hostOf(u){try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return ''}}
 $('imp-form').onsubmit=async e=>{e.preventDefault();const url=$('imp-url').value.trim();if(!/^https?:\/\//i.test(url)){$('imp-status').textContent='Vložte celý odkaz začínající https://';return}
