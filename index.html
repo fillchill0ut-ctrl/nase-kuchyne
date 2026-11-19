@@ -376,9 +376,9 @@ function renderWeek(){
         <div class="mtitle" style="text-decoration:line-through">${esc(m.title||'—')}</div>
         <div class="mnote">Suroviny jsou mimo nákup a z Doma se neodeberou.</div>
         <div class="row" style="margin-top:4px;gap:14px"><button class="link" data-unskip="${di}|${slot}">Přece uděláme</button><button class="link" data-swap="${di}|${slot}">Vybrat jiné jídlo</button></div>${sw?swapBox():''}</div></div>`;return}
-      h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
+      h+=`<div class="meal">${rr?`<button class="thumb" data-open="${esc(m.recipeId)}" data-serv="${mealServ(m)}" aria-label="${esc(m.title)}">${pic(rr,m.recipeId)}</button>`:'<span class="thumb" aria-hidden="true"></span>'}<div><span class="slot">${SLOTN[slot]}</span>
         ${m.leftover?'<span class="leftover">Zbytek</span>':''}
-        <button class="mtitle${has?' has':''}" data-open="${esc(m.recipeId||'')}" ${has?'':'disabled'}>${esc(m.title||'—')}</button>
+        <button class="mtitle${has?' has':''}" data-open="${esc(m.recipeId||'')}" data-serv="${mealServ(m)}" ${has?'':'disabled'}>${esc(m.title||'—')}</button>
         ${m.note?`<div class="mnote">${esc(m.note)}</div>`:''}
         ${rr?.sourceUrl?`<div style="margin-top:3px"><a class="link" href="${esc(rr.sourceUrl)}" target="_blank" rel="noopener">Recept na webu ↗</a></div>`:''}
         ${!sw&&!reqFor(d.date,slot)?`<div class="row" style="margin-top:4px;gap:14px"><button class="link" data-swap="${di}|${slot}">${has?'Vyměnit jídlo':'Vybrat jídlo'}</button>${has||m.leftover?`<button class="link" data-skip="${di}|${slot}" style="color:var(--muted)">Nebudeme dělat</button>`:''}</div>`:''}
@@ -394,7 +394,7 @@ function renderWeek(){
     if(dl.season?.length)h+=`<p class="sub" style="margin-bottom:0"><b>Sezóna teď:</b> ${esc(dl.season.join(', '))}</p>`;
     h+='</details>'}
   el.innerHTML=h;bindSeg();
-  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open,'week'));
+  el.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openRecipe(b.dataset.open,'week',+b.dataset.serv||null));
   el.querySelectorAll('[data-swap]').forEach(b=>b.onclick=()=>{const [di,slot]=b.dataset.swap.split('|');S.swap={pid:W.pid,di:+di,slot,hint:'',busy:false,msg:''};renderWeek();$('swap-hint')?.focus()});
   if($('swap-hint')){$('swap-hint').oninput=e=>S.swap.hint=e.target.value;
     $('swap-hint').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();askSwap('own')}};
@@ -659,14 +659,20 @@ $('imp-form').onsubmit=async e=>{e.preventDefault();const url=$('imp-url').value
   $('imp-url').value='';$('imp-note').value=''};
 /* favourites get a general version (r.general) written by Claude; the week keeps its week-specific version */
 function RV(r){return r&&r.general?{...r,...r.general}:r}
-function openRecipe(id,ctx){S.openRecipe=id||null;S.recipeCtx=ctx||'lib';S.recipeAlt=false;renderSheet()}
+function openRecipe(id,ctx,serv){S.openRecipe=id||null;S.recipeCtx=ctx||'lib';S.recipeAlt=false;S.recipeServ=serv||null;renderSheet()}
+/* portions: the plan says how many to cook (m.servings, or "vařte Y" / "Y porcí" in the note); the sheet scales the amounts */
+function mealServ(m){if(m.servings)return +m.servings||'';const n=m.note||'';const a=n.match(/vařte\s+(\d+)/i)||n.match(/(\d+)\s*porc/i);return a?+a[1]:''}
+function fmtN(v){if(v>=20)return String(Math.round(v/5)*5);if(v>=5)return String(Math.round(v));const r=v<1?Math.round(v*4)/4:Math.round(v*2)/2;return String(r||0.25).replace('.',',')}
+function scaleQty(q,k){if(!q||Math.abs(k-1)<1e-9)return q;const num=x=>x.includes('/')?(+x.split('/')[0])/(+x.split('/')[1]):parseFloat(x.replace(',','.'));
+  return String(q).replace(/(\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)(\s*[–-]\s*)?(\d+(?:[.,]\d+)?)?/,(m,a,dash,b)=>fmtN(num(a.replace(/\s/g,''))*k)+(dash&&b?dash+fmtN(num(b)*k):(dash||'')+(b||'')))}
 function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.recipes.get(id);
   if(r0&&!sh.hidden&&sh.dataset.rid===id&&($('sh-editbox')?.innerHTML||document.activeElement?.id==='sh-mynote'))return; sh.dataset.rid=id||'';
   if(!r0){sh.hidden=true;document.body.style.overflow='';return}
   const weekVer=!!r0.general&&S.recipeCtx==='week'&&[S.plan?.weekStart,S.planNext?.weekStart].includes(r0.general.fromWeek);
   const showGen=!!r0.general&&(weekVer?S.recipeAlt:!S.recipeAlt);
   const r=showGen?RV(r0):r0;
-  const genPending=r0.fav&&!r0.general&&!r0.saved;
+  const genPending=(r0.fav||r0.rating==='up')&&!r0.general&&!r0.saved;
+  const base=+r.servings||null, want=S.recipeServ||base, k=base&&want?want/base:1;
   const src=r.source&&/^https?:\/\//.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</a>`:esc(r.source||'');
   sh.innerHTML=`<div class="wrap stack"><div class="row" style="justify-content:space-between"><button class="btn" id="sh-x">← Zpět</button>
       <button class="btn${r.fav?' primary':''}" id="sh-fav" aria-pressed="${!!r.fav}">${r.fav?'★ Oblíbené':'☆ Oblíbit'}</button></div>
@@ -676,10 +682,11 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.
     ${genPending?'<div style="background:#fff6cf;color:#5a4a00;border-radius:var(--r);padding:10px 14px"><b>Claude připravuje obecnou verzi receptu</b><div style="margin-top:4px">Bez vazby na tento týden (co bylo doma, akce, množství) – do 2 hodin.</div></div>':''}
     ${r0.general?`<div class="row" style="gap:8px;align-items:center"><span class="sub">${showGen?'Obecný recept':'Verze pro tento týden'}</span><button class="btn ghost" id="sh-alt" style="padding:4px 10px">${showGen?(weekVer?'Zpět na tento týden':'Zobrazit verzi z týdne'):'Zobrazit obecný recept'}</button></div>`:''}
     <div><h2 id="sheet-title" style="margin-top:6px">${esc(r.title)}</h2>
-      <div class="sub num">${r.time?r.time+' min celkem':''}${r.active?' · aktivně '+r.active+' min':''}${r.servings?' · '+r.servings+' porce':''}</div></div>
+      <div class="sub num">${r.time?r.time+' min celkem':''}${r.active?' · aktivně '+r.active+' min':''}</div>
+      ${base?`<div class="row" style="gap:8px;align-items:center;margin-top:6px"><span class="sub">Porcí:</span><button class="btn ghost" id="sh-sm" style="padding:2px 12px" aria-label="Méně porcí">−</button><b class="num" id="sh-sv">${want}</b><button class="btn ghost" id="sh-sp" style="padding:2px 12px" aria-label="Více porcí">+</button><span class="sub">${k!==1?`recept je na ${base} – množství jsou přepočtená`:''}</span></div>`:''}</div>
     ${r.note?`<p style="margin:0;max-width:60ch">${esc(r.note)}</p>`:''}
     <div class="tags">${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
-    <h3>Suroviny</h3><ul class="ing">${(r.ingredients||[]).map(i=>`<li><span>${esc(i.name)}</span><span class="num">${esc(i.qty)}</span></li>`).join('')}</ul>
+    <h3>Suroviny</h3><ul class="ing">${(r.ingredients||[]).map(i=>`<li><span>${esc(i.name)}</span><span class="num">${esc(scaleQty(i.qty,k))}</span></li>`).join('')}</ul>
     <div class="row"><button class="btn" id="sh-add">Přidat suroviny na seznam</button><a class="btn" href="${imgSearch(r.title)}" target="_blank" rel="noopener">Fotky tohoto jídla ↗</a></div>
     ${r.sourceUrl?`<a class="panel" href="${esc(r.sourceUrl)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:var(--ink)"><span class="eyebrow">Recept na webu</span><br><b>${esc(r.sourceLabel||r.sourceUrl.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])}</b> ↗</a>`:''}
     <h3>Postup</h3><ol>${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
@@ -692,12 +699,14 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.
   sh.hidden=false;document.body.style.overflow='hidden';
   $('sh-x').onclick=()=>openRecipe(null);
   if($('sh-alt'))$('sh-alt').onclick=()=>{S.recipeAlt=!S.recipeAlt;renderSheet()};
+  if($('sh-sm')){$('sh-sm').onclick=()=>{S.recipeServ=Math.max(1,want-1);renderSheet()};$('sh-sp').onclick=()=>{S.recipeServ=want+1;renderSheet()}}
   $('sh-mynote').onchange=async e=>{const v=e.target.value.trim();if(v===(r0.userNote||''))return;if(await write(()=>db.doc('recipes/'+id).update({userNote:v})))$('sh-mynote-st').textContent='Uloženo.'};
   bindPicker('shp',id,()=>openRecipe(null));
   $('sh-del').onclick=async()=>{if(!$('sh-del').dataset.sure){$('sh-del').dataset.sure='1';$('sh-del').textContent='Opravdu smazat? Klepněte znovu';return}
     if(await write(()=>db.doc('recipes/'+id).delete(),'Recept smazán.'))openRecipe(null)};
   $('sh-edit').onclick=()=>{const box=$('sh-editbox');if(box.innerHTML){box.innerHTML='';return}
-    box.innerHTML=`<form class="panel stack" id="sh-eform" style="gap:8px">
+    const eg=!!r0.general, r=eg?RV(r0):r0;
+    box.innerHTML=`<form class="panel stack" id="sh-eform" style="gap:8px">${eg?'<p class="sub" style="margin:0">Upravujete obecný recept – podle něj Claude jídlo příště zařadí.</p>':''}
       <label class="stack" style="gap:4px"><span class="sub">Název</span><input type="text" id="se-title" value="${esc(r.title)}"></label>
       <div class="row" style="flex-wrap:nowrap"><label class="stack" style="gap:4px;flex:1"><span class="sub">Počet porcí receptu</span><input type="text" inputmode="numeric" id="se-serv" value="${esc(r.servings||'')}"></label><label class="stack" style="gap:4px;flex:1"><span class="sub">Čas (min)</span><input type="text" inputmode="numeric" id="se-time" value="${esc(r.time||'')}"></label></div>
       <label class="stack" style="gap:4px"><span class="sub">Suroviny – každá na řádek: název | množství</span><textarea id="se-ing" style="min-height:140px">${esc((r.ingredients||[]).map(i=>i.name+(i.qty?' | '+i.qty:'')).join('\n'))}</textarea></label>
@@ -708,16 +717,19 @@ function renderSheet(){const sh=$('sheet');const id=S.openRecipe;const r0=id&&S.
       const ing=$('se-ing').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [n,...q]=l.split('|');return {name:n.trim(),qty:q.join('|').trim()}});
       const steps=$('se-steps').value.split('\n').map(l=>l.trim()).filter(Boolean);
       const patch={title:$('se-title').value.trim()||r.title,servings:parseInt($('se-serv').value,10)||r.servings||null,time:parseInt($('se-time').value,10)||r.time||null,ingredients:ing,steps,note:$('se-note').value.trim()};
-      if(!showGen&&r.importStatus&&r.importStatus!=='ok'&&ing.length)patch.importStatus='manual';
-      const upd=showGen?{general:{...r0.general,...patch}}:patch;
+      if(!eg&&r.importStatus&&r.importStatus!=='ok'&&ing.length)patch.importStatus='manual';
+      const upd=eg?{general:{...r0.general,...patch},editedAt:new Date().toISOString()}:{...patch,editedAt:new Date().toISOString()};
       if(await write(()=>db.doc('recipes/'+id).update(upd),'Recept uložen.')){$('sh-editbox').innerHTML='';renderSheet()}}};
   if($('sh-photo'))$('sh-photo').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;toast('Nahrávám fotku…');
     try{const up=await assets.upload(f);await write(()=>db.doc('recipes/'+id).update({photo:up.id}),'Fotka uložena.')}catch(err){toast(err?.code==='too_large'?'Fotka je moc velká (max 20 MB).':'Fotku se nepodařilo nahrát.')}};
   if($('sh-nophoto'))$('sh-nophoto').onclick=()=>write(()=>db.doc('recipes/'+id).update({photo:null}));
+  const askGen=msg=>{if(r0.general||r0.saved||S.requests.some(q=>q.type==='generalize'&&q.recipeId===id&&q.status==='waiting'))return;
+    return write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'generalize',recipeId:id,weekStart:(S.recipeCtx==='week'?WP().p?.weekStart:S.plan?.weekStart)||'',status:'waiting',createdAt:new Date().toISOString()}),msg)};
   $('sh-fav').onclick=async()=>{const on=!r0.fav;if(!await write(()=>db.doc('recipes/'+id).update({fav:on})))return;
-    if(on&&!r0.general&&!r0.saved)await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'generalize',recipeId:id,weekStart:(S.recipeCtx==='week'?WP().p?.weekStart:S.plan?.weekStart)||'',status:'waiting',createdAt:new Date().toISOString()}),'Přidáno do oblíbených. Claude připraví obecnou verzi receptu – do 2 hodin.')};
-  sh.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>write(()=>db.doc('recipes/'+id).update({rating:r.rating===b.dataset.rate?null:b.dataset.rate})));
-  $('sh-add').onclick=async()=>{const base=Date.now();let n=0;for(const i of r.ingredients||[]){const ok=await write(()=>db.collection('items').add({name:i.name,qty:i.qty,store:'Kdekoli',cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',note:r.title,trip:1,order:base+n}));if(!ok)return;n++}toast(`Přidáno ${n} surovin na seznam.`)};
+    if(on)await askGen('Přidáno do oblíbených. Claude připraví obecnou verzi receptu – do 2 hodin.')};
+  sh.querySelectorAll('[data-rate]').forEach(b=>b.onclick=async()=>{const v=r0.rating===b.dataset.rate?null:b.dataset.rate;if(!await write(()=>db.doc('recipes/'+id).update({rating:v})))return;
+    if(v==='up')await askGen('Chutnalo – Claude připraví obecnou verzi receptu, ať jde kdykoli uvařit znovu.')});
+  $('sh-add').onclick=async()=>{const base=Date.now();let n=0;for(const i of r.ingredients||[]){const ok=await write(()=>db.collection('items').add({name:i.name,qty:scaleQty(i.qty,k),store:'Kdekoli',cat:'Ostatní',price:null,regular:null,sale:false,checked:false,source:'manual',note:r.title,trip:1,order:base+n}));if(!ok)return;n++}toast(`Přidáno ${n} surovin na seznam.`)};
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.openRecipe)openRecipe(null)});
 
