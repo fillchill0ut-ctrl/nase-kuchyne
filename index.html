@@ -280,11 +280,7 @@ nav.tabs button{font-size:12px}
 
     <section id="v-profil" hidden>
       <h2>Profil</h2>
-      <div class="banner" id="p-replan" hidden>
-        <b>Upravit podle toho i zbytek tohoto týdne?</b>
-        <span class="sub" style="color:var(--ink)">Změny v profilu se jinak projeví až v novém plánu v neděli. Claude upraví zbývající dny a nekoupené položky na seznamu. Co už máte koupené, zůstane a využije se.</span>
-        <div class="row"><button class="btn primary" type="button" id="p-replan-go">Přeplánovat zbytek týdne</button><button class="btn ghost" type="button" id="p-replan-no">Ne, až od neděle</button></div>
-      </div>
+      <div class="banner" id="p-replan" hidden></div>
       <div id="p-main" class="stack" style="gap:18px;margin-top:12px"></div>
       <div class="panel row" style="margin-top:20px;justify-content:space-between"><span class="sub">Přihlášen: <b id="who"></b></span><button class="btn ghost" id="logout" type="button">Odhlásit</button></div>
     </section>
@@ -367,8 +363,8 @@ function renderWeek(){
       <div class="stat"><b class="num">${open.length}</b><span>položek zbývá koupit</span></div></div>`;
   if(p.shops?.length){h+=`<div class="stack" style="margin-top:16px"><p class="eyebrow" style="margin:0">Kdy nakoupit</p>`;
     p.shops.forEach(s=>{h+=`<div class="shop"><h3>${esc(s.title)} · ${esc(s.when)}</h3><div class="sub">${esc(s.stores||'')}</div>${s.note?`<div class="mnote">${esc(s.note)}</div>`:''}</div>`});h+='</div>'}
-  const rp=W.w==='this'?(S.requests||[]).find(r=>r.type==='replan'):null;
-  if(rp){h+=`<div class="banner">${rp.status==='done'?`<b>Zbytek týdne je upravený podle nových pravidel</b>${rp.message?`<span>${esc(rp.message)}</span>`:''}`:rp.status==='error'?`<b>Přeplánování se nepovedlo</b><span>${esc(rp.message||'')}</span>`:`<b>Čeká na přeplánování zbytku týdne</b><span class="sub" style="color:var(--ink)">Claude upraví zbývající dny a nákupní seznam podle nových pravidel, obvykle do 2 hodin.</span>`}
+  const rp=(S.requests||[]).find(r=>r.type==='replan'&&(p.days||[]).some(d=>d.date===r.fromDate));
+  if(rp){h+=`<div class="banner">${rp.status==='done'?`<b>${W.w==='next'?'Příští týden je upravený':'Zbytek týdne je upravený'} podle profilu a vzkazu</b>${rp.message?`<span>${esc(rp.message)}</span>`:''}`:rp.status==='error'?`<b>Přeplánování se nepovedlo</b><span>${esc(rp.message||'')}</span>`:`<b>Čeká na přeplánování ${W.w==='next'?'příštího týdne':'zbytku týdne'}</b><span class="sub" style="color:var(--ink)">Claude upraví ${W.w==='next'?'jídla':'zbývající dny'} a nákupní seznam podle profilu a vzkazu k tomuto týdnu, obvykle do 2 hodin.</span>`}
     <div class="row"><button class="btn ghost" data-reqcancel="${esc(rp.id)}">${rp.status==='waiting'?'Zrušit':'Zavřít'}</button></div></div>`}
   h+=`<div class="stack" style="margin-top:18px">`;
   (p.days||[]).forEach((d,di)=>{const L=dateLabel(d.date);
@@ -768,7 +764,7 @@ function normProfile(p){p=p||{};return {...p,
   members:Array.isArray(p.members)?p.members:[],requirements:Array.isArray(p.requirements)?p.requirements:[],
   likes:arr(p.likes),avoid:arr(p.avoid),allergies:arr(p.allergies),planning:(p.planning&&typeof p.planning==='object')?p.planning:{},
   stores:Array.isArray(p.stores)?p.stores.map(s=>typeof s==='string'?{name:s,use:'often'}:s):arr(p.stores).map(n=>({name:n,use:'often'})),
-  sites:Array.isArray(p.sites)?p.sites.map(s=>typeof s==='string'?{name:s,url:''}:s):arr(p.sites).map(n=>({name:n,url:''})),notes:p.notes||''}}
+  sites:Array.isArray(p.sites)?p.sites.map(s=>typeof s==='string'?{name:s,url:''}:s):arr(p.sites).map(n=>({name:n,url:''})),notes:p.notes||'',weekNotes:(p.weekNotes&&typeof p.weekNotes==='object')?p.weekNotes:{}}}
 function prof(){return normProfile(S.profile)}
 function daysTxt(d){if(!d||!d.length)return 'Vždy';const s=[...d].sort((a,b)=>a-b),j=s.join();
   if(j==='1,2,3,4,5')return 'Po–Pá';if(j==='1,2,3,4,5,6,7')return 'Každý den';return s.map(i=>DSH[i-1]).join(', ')}
@@ -788,11 +784,27 @@ function profileText(pr){const p=normProfile(pr);const L=[];
   if(p.sites.length)L.push('Weby s recepty: '+p.sites.map(s=>s.name).join(', '));
   return L.join('\n')}
 function storeList(){const s=prof().stores.filter(x=>x.use!=='no').map(x=>x.name);return [...new Set([...(s.length?s:['Kaufland','Albert','Billa','Lidl','Rohlík']),'Kdekoli'])]}
-async function saveProfile(patch,msg){const data={...(S.profile||{}),...patch,updatedAt:new Date().toISOString()};
+function thisWeekStart(){if(S.plan?.weekStart)return S.plan.weekStart;const d=new Date();d.setHours(12);d.setDate(d.getDate()-((d.getDay()+6)%7));return isoD(d)}
+function weekRange(ws){const a=new Date(ws+'T12:00:00'),b=new Date(a);b.setDate(b.getDate()+6);return `${a.getDate()}. ${a.getMonth()+1}. – ${b.getDate()}. ${b.getMonth()+1}.`}
+/* which planned weeks can still be changed: this week (days left) and next week (only once its plan exists) */
+function replanTargets(){const t=todayISO(),o=[];if(S.plan?.days?.some(d=>d.date>t||(d.date===t&&new Date().getHours()<14)))o.push('this');if(S.planNext?.days?.length)o.push('next');return o}
+function showReplan(targets,why){const box=$('p-replan');const T=replanTargets().filter(x=>targets.includes(x));if(!T.length){box.hidden=true;return}
+  const lbl={this:'tento týden ('+weekRange(S.plan.weekStart)+')',next:'příští týden ('+weekRange(S.planNext.weekStart)+')'};
+  box.innerHTML=`<b>${why==='next'?'Plán na příští týden už je hotový. Upravit ho podle vzkazu?':why==='this'?'Upravit podle vzkazu zbývající dny tohoto týdne?':'Upravit podle toho i už naplánované dny?'}</b>
+    <span class="sub" style="color:var(--ink)">${why?'':'Jinak se změna projeví až v dalším plánu, který Claude dělá v pátek. '}Claude upraví jídla a nekoupené položky na seznamu – co už máte koupené, zůstane a využije se.</span>
+    <div class="row" style="flex-wrap:wrap">${T.map(w=>`<button class="btn primary" type="button" data-replan="${w}">Upravit ${T.length>1?lbl[w]:(w==='this'?'zbytek tohoto týdne':'příští týden')}</button>`).join('')}${T.length>1?'<button class="btn primary" type="button" data-replan="both">Upravit oba</button>':''}<button class="btn ghost" type="button" data-replan="no">Ne, nechat</button></div>`;
+  box.hidden=false}
+async function saveProfile(patch,msg,why){const data={...(S.profile||{}),...patch,updatedAt:new Date().toISOString()};
   ['household','week','rules','goals','budget'].forEach(k=>delete data[k]);
+  if(data.weekNotes){const keep=thisWeekStart();data.weekNotes=Object.fromEntries(Object.entries(data.weekNotes).filter(([k,v])=>k>=keep&&v))}
   const ok=await write(()=>db.doc('meta/profile').set(data),msg);
-  if(ok){const p=S.plan;const t=todayISO();if(p?.days?.some(d=>d.date>=t))$('p-replan').hidden=false}
+  if(ok)showReplan(why==='this'?['this']:why==='next'?['next']:['this','next'],why);
   return ok}
+async function sendReplan(w){const t=todayISO();let from;
+  if(w==='next')from=S.planNext.weekStart;else{const d=new Date();from=d.getHours()<14?t:(()=>{d.setDate(d.getDate()+1);return isoD(d)})()}
+  const p=w==='next'?S.planNext:S.plan;const old=(S.requests||[]).filter(r=>r.type==='replan'&&(p?.days||[]).some(d=>d.date===r.fromDate));
+  for(const r of old)await write(()=>db.doc('meta/'+r.id).delete());
+  return write(()=>db.doc('meta/req-'+Date.now().toString(36)+w.charAt(0)).set({type:'replan',pid:w==='next'?'plan-next':'plan',fromDate:from,status:'waiting',createdAt:new Date().toISOString()}))}
 function reqRow(r,attr){const dd=(r.days||[]).length;return `<button class="prow req" data-preq="${esc(r.id)}"><span class="dtag ${dd?'on':''}">${esc(daysTxt(r.days))}</span><span class="t">${esc(r.text)}${r.meal&&r.meal!=='day'?` <span class="muted">(${MEALN[r.meal]})</span>`:''}</span></button>`}
 function sortedReqs(p){return [...p.requirements].sort((a,b)=>((b.days||[]).length?1:0)-((a.days||[]).length?1:0))}
 function renderProfile(){
@@ -813,7 +825,12 @@ function renderProfile(){
     `<span class="sub">Klepnutím přepnete Běžně → Občas → Nepoužíváme. <button class="link" data-pstores>Upravit seznam</button></span></div></div>`;
   h+=`<div class="pg"><span class="eyebrow">Weby s recepty</span><div class="pcard pad"><div class="tl">${p.sites.map(s=>`<button class="tc" data-psites>${esc(s.name)}</button>`).join('')}<button class="tc add" data-psites>+ přidat web</button></div><button class="link" style="align-self:flex-start" data-psites>Upravit seznam</button></div></div>`;
   if(lp)h+=`<div class="pg"><span class="eyebrow">Co se Claude naučil z hodnocení</span><div class="pcard pad"><p style="margin:0">${esc(lp)}</p></div></div>`;
-  h+=`<div class="pg"><span class="eyebrow">Tento týden</span><div class="pcard pad"><label for="p-notes" style="font-weight:600">Vzkaz pro příští plán</label><textarea id="p-notes" placeholder="Např. v sobotu máme návštěvu">${esc(p.notes)}</textarea><span class="sub">Všechny změny se ukládají hned.</span></div></div>`;
+  const tw=thisWeekStart(),nw=nextWeekStart(),wn=p.weekNotes;
+  h+=`<div class="pg"><span class="eyebrow">Vzkazy k týdnům</span><div class="pcard pad">
+    <label for="p-wn-this" style="font-weight:600">Tento týden <span class="muted" style="font-weight:400">${weekRange(tw)}</span></label><textarea id="p-wn-this" data-wnk="${tw}" placeholder="Např. ve čtvrtek nejsem doma na večeři">${esc(wn[tw]||'')}</textarea>
+    <span class="sub">Po uložení se zeptám, jestli upravit zbývající dny.</span>
+    <label for="p-wn-next" style="font-weight:600;margin-top:10px">Příští týden <span class="muted" style="font-weight:400">${weekRange(nw)}</span></label><textarea id="p-wn-next" data-wnk="${nw}" placeholder="Např. v sobotu máme návštěvu, v neděli obědváme venku">${esc(wn[nw]||(p.notes&&!S.planNext?p.notes:''))}</textarea>
+    <span class="sub">${S.planNext?'Plán už je hotový – po uložení se zeptám, jestli ho podle vzkazu upravit.':'Claude s tím počítá v pátek, až bude plánovat příští týden.'}</span></div></div>`;
   $('p-main').innerHTML=h;
 }
 $('p-main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
@@ -826,7 +843,8 @@ $('p-main').addEventListener('click',e=>{const b=e.target.closest('button');if(!
   else if('psites' in d)openPS({type:'sites'})});
 $('p-main').addEventListener('change',e=>{const t=e.target;
   if(t.dataset.ppl){const p=prof();saveProfile({planning:{...p.planning,[t.dataset.ppl]:t.value.trim()}},'Uloženo.')}
-  else if(t.id==='p-notes')saveProfile({notes:t.value.trim()},'Vzkaz uložen.')});
+  else if(t.id==='p-wn-this'||t.id==='p-wn-next'){const w=t.id==='p-wn-this'?'this':'next';const wn={...prof().weekNotes,[t.dataset.wnk]:t.value.trim()};
+    saveProfile({weekNotes:wn,...(w==='next'?{notes:''}:{})},w==='next'&&!S.planNext?'Uloženo – Claude s tím počítá při pátečním plánování.':'Vzkaz uložen.',w)}});
 
 /* profile editors (full-screen sheet) */
 S.ps=null;
@@ -920,11 +938,10 @@ $('psheet').addEventListener('submit',async e=>{e.preventDefault();const f=e.tar
 $('psheet').addEventListener('change',e=>{const t=e.target;if(S.ps?.type!=='stores'||t.dataset.stname==null)return;const p=prof();const i=+t.dataset.stname;const v=t.value.trim();
   if(!v){t.value=p.stores[i].name;return}const st=p.stores.map(s=>({...s}));st[i].name=v;saveProfile({stores:st},'Přejmenováno.')});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.ps)closePS()});
-$('p-replan-no').onclick=()=>{$('p-replan').hidden=true};
-$('p-replan-go').onclick=async()=>{const t=todayISO();const d=new Date();const from=d.getHours()<14?t:(()=>{d.setDate(d.getDate()+1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
-  const old=(S.requests||[]).filter(r=>r.type==='replan');for(const r of old)await write(()=>db.doc('meta/'+r.id).delete());
-  const ok=await write(()=>db.doc('meta/req-'+Date.now().toString(36)).set({type:'replan',fromDate:from,status:'waiting',createdAt:new Date().toISOString()}),'Posláno Claudovi. Změny uvidíte na kartě Týden.');
-  if(ok){$('p-replan').hidden=true;show('tyden')}};
+$('p-replan').addEventListener('click',async e=>{const b=e.target.closest('[data-replan]');if(!b)return;const w=b.dataset.replan;
+  if(w==='no'){$('p-replan').hidden=true;return}
+  const ws=w==='both'?['this','next']:[w];let ok=true;for(const x of ws)ok=(await sendReplan(x))&&ok;
+  if(ok){toast('Posláno Claudovi – změny uvidíte na kartě Týden, obvykle do 2 hodin.');$('p-replan').hidden=true;S.wk=ws.includes('next')&&!ws.includes('this')?'next':'this';try{localStorage.setItem('nk-wk',S.wk)}catch(e){}show('tyden')}});
 
 const normName=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 /* ---------- pantry: docs 'pantry' = {items:[{id,name,qty}], done:["<date>:<slot>"]}.
