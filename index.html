@@ -826,7 +826,7 @@ function renderProfile(){
   h+=`<div class="pg"><span class="eyebrow">Weby s recepty</span><div class="pcard pad"><div class="tl">${p.sites.map(s=>`<button class="tc" data-psites>${esc(s.name)}</button>`).join('')}<button class="tc add" data-psites>+ přidat web</button></div><button class="link" style="align-self:flex-start" data-psites>Upravit seznam</button></div></div>`;
   if(lp)h+=`<div class="pg"><span class="eyebrow">Co se Claude naučil z hodnocení</span><div class="pcard pad"><p style="margin:0">${esc(lp)}</p></div></div>`;
   const tw=thisWeekStart(),nw=nextWeekStart(),wn=p.weekNotes;
-  h+=`<div class="pg"><span class="eyebrow">Vzkazy k týdnům</span><div class="pcard pad">
+  h+=`<div class="pg"><span class="eyebrow">Vzkazy k týdnům</span><div class="pcard pad"><span class="sub" style="margin-bottom:4px">Vzkaz platí jen pro daný týden a má vždy přednost před stálými požadavky.</span>
     <label for="p-wn-this" style="font-weight:600">Tento týden <span class="muted" style="font-weight:400">${weekRange(tw)}</span></label><textarea id="p-wn-this" data-wnk="${tw}" placeholder="Např. ve čtvrtek nejsem doma na večeři">${esc(wn[tw]||'')}</textarea>
     <span class="sub">Po uložení se zeptám, jestli upravit zbývající dny.</span>
     <label for="p-wn-next" style="font-weight:600;margin-top:10px">Příští týden <span class="muted" style="font-weight:400">${weekRange(nw)}</span></label><textarea id="p-wn-next" data-wnk="${nw}" placeholder="Např. v sobotu máme návštěvu, v neděli obědváme venku">${esc(wn[nw]||(p.notes&&!S.planNext?p.notes:''))}</textarea>
